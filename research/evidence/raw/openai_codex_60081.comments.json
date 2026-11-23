@@ -1,0 +1,49 @@
+[
+  {
+    "url": "https://api.github.com/repos/openai/codex/issues/comments/6822044594",
+    "html_url": "https://github.com/openai/codex/issues/60081#issuecomment-6822044594",
+    "issue_url": "https://api.github.com/repos/openai/codex/issues/60081",
+    "id": 6822044594,
+    "node_id": "IC_kwDOOYsS4c8AAAABlqAjsg",
+    "user": {
+      "login": "Shanmukh-l33t",
+      "id": 351996406,
+      "node_id": "U_kgDOFPsJ9g",
+      "avatar_url": "https://avatars.githubusercontent.com/u/351996406?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/Shanmukh-l33t",
+      "html_url": "https://github.com/Shanmukh-l33t",
+      "followers_url": "https://api.github.com/users/Shanmukh-l33t/followers",
+      "following_url": "https://api.github.com/users/Shanmukh-l33t/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Shanmukh-l33t/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/Shanmukh-l33t/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Shanmukh-l33t/subscriptions",
+      "organizations_url": "https://api.github.com/users/Shanmukh-l33t/orgs",
+      "repos_url": "https://api.github.com/users/Shanmukh-l33t/repos",
+      "events_url": "https://api.github.com/users/Shanmukh-l33t/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/Shanmukh-l33t/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "created_at": "2026-11-12T11:13:50Z",
+    "updated_at": "2026-11-12T11:13:50Z",
+    "body": "## Root cause: PowerShell Core-only type accelerator, missed because AST validation is parse-time and edition-agnostic\n\nI audited the harness code behind this (checkout `c0cc9fc820f62e4dbdde68214dd6d792d6c8a7ee`, file/line refs verified against that tree). The failure is not a parser-version mismatch — it is a **runtime type-resolution mismatch that no AST parse in any edition can see**, including 5.1's own parser.\n\n### Why AST validation passes but 5.1 execution fails\n\nThe construct in this report is the `ulong` type accelerator in a cast expression (`[ulong]171798691840`). `ulong` is a PowerShell Core-only accelerator — PowerShell/PowerShell#7813 (cited above) added the C#-style accelerators `ulong`, `ushort`, `uint`, `short` after Windows PowerShell 5.1 shipped, so 5.1 never had them. At **parse** time a type literal is just a `TypeExpressionAst`/token in every edition — the parser never consults the type table — so `Parser::ParseInput` returns 0 errors for `[ulong]171798691840` in **both** interpreters (exactly the repro table above: \"AST parse errors: 0 / 0\"). At **evaluation** time the cast binds the name through the accelerator table; under 5.1 that name is unresolvable, hence `Unable to find type [ulong].` `[UInt64]` works in both because `System.UInt64` resolves as a full BCL type name independently of accelerators (again the report's table).\n\nKey implication for the requested improvement: **validating with the 5.1 parser would not have caught this either** (5.1's parse-error count is also 0 in the repro). The compatibility check has to be binding-level (type resolution), not just \"run ParseInput under 5.1\". The second finding in the report is the same class one step further: `[Math]::Min([int]4194304, [UInt64]30784094208)` fails in *both* editions because overload selection happens at method-binding time — invisible to any static parse.\n\n### What the harness actually validates today (and where the gap sits in this repo)\n\n- There is no production compatibility/AST gate for generated scripts. The only `ParseInput` sites in the tree are the command-safety test oracle `codex-rs/shell-command/src/command_safety/powershell_parser.ps1:32-43` (parse-errors check at :41-43) and a test for the repo-authored `removal.ps1` (`codex-rs/windows-sandbox-service/src/registered_runtime/removal_tests.rs:36-41`). The AST check in the incident was run ad hoc by the model inside the **control** process (PS 7.6.5) — i.e., against the wrong edition's semantics relative to the explicitly selected child — which this codebase does nothing to prevent or detect.\n- Production command classification is a single edition-agnostic grammar: `codex-rs/shell-command/src/command_safety/powershell_tree_sitter.rs:13-15`, wired in `codex-rs/shell-command/src/command_safety/mod.rs:1-9` (the real PowerShell AST oracle is `#[cfg(test)]` there). The gate already models one *edition-dependent syntax* case — `` `e `` is rejected as \"PowerShell-version-dependent escape\" (`powershell_tree_sitter.rs:380-383`) — but has no notion of edition-dependent *semantics* like accelerator tables. (Sibling gap visible in the same allowlist: `pipeline_chain` at `powershell_tree_sitter.rs:149-150` accepts `&&`/`||`, which is PS7-only *syntax*; a 5.1 child would reject those at parse time. Not re-verified on 5.1 here — flagged as expected behavior from the PS7 introduction of chain operators.)\n- Edition identity is collapsed before any policy sees it: `codex-rs/shell-command/src/shell_detect.rs:46-47` maps both `pwsh` and `powershell` to one `ShellType::PowerShell`, and shell detection falls back to `C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe` (`shell_detect.rs:275-276`) with `pwsh` preferred (`shell_detect.rs:280-291`). Exec-policy lowering (`codex-rs/core/src/exec_policy.rs:971-1001`, PowerShell branch :984-995) therefore classifies a script identically whether it will run under 7.x or 5.1.\n- The codebase demonstrably knows about 5.1-vs-7 differences in the *parser host*: `powershell_parser.ps1:241-245` avoids a direct `PipelineChainAst` type reference because \"Windows PowerShell 5.1 does not define PipelineChainAst\". The missing piece is applying that edition awareness to the *target* of the generated script. `codex-rs/shell-command/src/powershell.rs:97-106` documents the `pwsh.exe` (Core) vs `powershell.exe` (5.1) split; no code path records which one a model-chosen child (the `Start-Process -FilePath 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'` in the report) will use.\n\n### Minimal fix shape\n\n1. **Generation-side:** when the explicitly selected interpreter is Windows PowerShell 5.1 (or `powershell.exe`), emit full BCL type names (`[UInt64]`, `[Int16]`, …) instead of Core-only accelerators (`ulong`, `ushort`, `uint`, `short` — the #7813 set). Same treatment as the existing `` `e `` policy: fail closed or rewrite on edition-dependent type spellings.\n2. **Validation-side:** pair the check with the executing edition *and* make it binding-aware. The per-executable parser plumbing already exists — `codex-rs/shell-command/src/command_safety/powershell_parser.rs:21-35` keeps one parser child per executable path. Extend the AST walk in `powershell_parser.ps1` to resolve every `TypeExpressionAst`'s `TypeName` against the target engine's type table (`TypeName.GetReflectionType()` returns null for names the engine can't resolve — unverified on 5.1 in this audit, but resolution-without-execution is its documented purpose) and report `unsupported` when any type name is unresolvable in the selected child's engine.\n3. For binding-time failures like the `[Math]::Min` overload case, static analysis is insufficient in principle; the report's own `& ([scriptblock]::Create($source))` probe under the target engine (or explicitly typing operands at generation time) is the realistic catch.\n\nAll line references above were checked against commit `c0cc9fc820f62e4dbdde68214dd6d792d6c8a7ee`; claims about PowerShell behavior are grounded in the repro table in this issue and PowerShell/PowerShell#7813. Items marked \"unverified\" were not re-tested on Windows PowerShell 5.1 in this audit.\n\n<sub>Posted by an automated analysis agent on the reporter's behalf; analysis-only, per this repo's contribution policy.</sub>\n",
+    "author_association": "NONE",
+    "pin": null,
+    "reactions": {
+      "url": "https://api.github.com/repos/openai/codex/issues/comments/6822044594/reactions",
+      "total_count": 0,
+      "+1": 0,
+      "-1": 0,
+      "laugh": 0,
+      "hooray": 0,
+      "confused": 0,
+      "heart": 0,
+      "rocket": 0,
+      "eyes": 0
+    },
+    "performed_via_github_app": null,
+    "minimized": null
+  }
+]

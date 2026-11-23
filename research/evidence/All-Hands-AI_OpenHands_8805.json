@@ -1,0 +1,111 @@
+{
+  "number": 8805,
+  "title": "[Bug]: Function 'execute_code' not found in available tools",
+  "state": "CLOSED",
+  "createdAt": "2025-05-30T08:16:14Z",
+  "author": {
+    "login": "atasever",
+    "is_bot": false
+  },
+  "labels": [
+    {
+      "id": "LA_kwDOLfkiw88AAAABjmuqhA",
+      "name": "bug",
+      "description": "Something isn't working",
+      "color": "d73a4a"
+    },
+    {
+      "id": "LA_kwDOLfkiw88AAAABnExxmw",
+      "name": "Stale",
+      "description": "Inactive for 40 days",
+      "color": "ededed"
+    },
+    {
+      "id": "LA_kwDOLfkiw88AAAAB_nqZuA",
+      "name": "llm",
+      "description": "Related to specific LLMs",
+      "color": "bfdadc"
+    }
+  ],
+  "url": "https://github.com/OpenHands/OpenHands/issues/8805",
+  "body": "### Is there an existing issue for the same bug? (If one exists, thumbs up or comment on the issue instead).\n\n- [x] I have checked the existing issues.\n\n### Describe the bug and reproduction steps\n\nI am getting the following error when using devstral as LLM.\n\nFunction 'execute_code' not found in available tools: ['execute_bash', 'think', 'finish', 'browser', 'execute_ipython_cell', 'str_replace_editor', 'fetch']\n\n### OpenHands Installation\n\nDocker command in README\n\n### OpenHands Version\n\n0.39\n\n### Operating System\n\nMacOS\n\n### Logs, Errors, Screenshots, and Additional Context\n\n08:05:40 - OBSERVATION\n[Agent Controller b86993b5f3e5409c805117a19aa11057] **ErrorObservation**\nFunction 'execute_code' not found in available tools: ['execute_bash', 'think', 'finish', 'browser', 'execute_ipython_cell', 'str_replace_editor', 'fetch']",
+  "comments": [
+    {
+      "id": "IC_kwDOLfkiw86uJwMF",
+      "author": {
+        "login": "enyst",
+        "is_bot": false
+      },
+      "authorAssociation": "MEMBER",
+      "body": "I think what happens is that devstral is hallucinating such tool. It's possible it's just a fluke, and it continues by correcting itself?",
+      "createdAt": "2025-05-30T09:32:32Z",
+      "url": "https://github.com/OpenHands/OpenHands/issues/8805#issuecomment-2921792261"
+    },
+    {
+      "id": "IC_kwDOLfkiw86uMoFI",
+      "author": {
+        "login": "lowlyocean",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "I just saw this as well, except the tool it tried is \"execute_command\". Would native tool calling help prevent this to some degree? I tried setting LLM_NATIVE_TOOL_CALLING true but get [this previously reported error](https://github.com/All-Hands-AI/OpenHands/issues/8684#issuecomment-2907925131)\n\nI'm using a version of Devstral that is listed by ollama as having tool support:\n```\nollama show hf.co/unsloth/Devstral-Small-2505-GGUF:Q2_K_numgpu41\n  Model\n    architecture        llama\n    parameters          23.6B\n    context length      131072\n    embedding length    5120\n    quantization        Q2_K\n\n  Capabilities\n    completion\n    tools\n    vision\n\n  Projector\n    architecture        clip\n    parameters          438.96M\n    embedding length    1024\n    dimensions          5120\n\n  Parameters\n    num_gpu        41\n    stop           \"<s>\"\n    stop           \"[INST]\"\n    temperature    0.15\n    min_p          0.01\n    num_ctx        32768\n```\n\nThis is the Modelfile that created this model. It works quite well in OpenHands most of the time, but I suspect native calling could help with these rare hallucinations\n```\nFROM hf.co/unsloth/Devstral-Small-2505-GGUF:Q2_K\nPARAMETER num_gpu 41\nPARAMETER num_ctx 32768\nPARAMETER temperature 0.15\nPARAMETER min_p 0.01\nTEMPLATE \"\"\"{{- range $index, $_ := .Messages }}\n{{- if eq .Role \"system\" }}[SYSTEM_PROMPT]{{ .Content }}[/SYSTEM_PROMPT]\n{{- else if eq .Role \"user\" }}\n{{- if and (le (len (slice $.Messages $index)) 2) $.Tools }}[AVAILABLE_TOOLS]{{ $.Tools }}[/AVAILABLE_TOOLS]\n{{- end }}[INST]{{ .Content }}[/INST]\n{{- else if eq .Role \"assistant\" }}\n{{- if .Content }}{{ .Content }}\n{{- if not (eq (len (slice $.Messages $index)) 1) }}</s>\n{{- end }}\n{{- else if .ToolCalls }}[TOOL_CALLS][\n{{- range .ToolCalls }}{\"name\": \"{{ .Function.Name }}\", \"arguments\": {{ .Function.Arguments }}}\n{{- end }}]</s>\n{{- end }}\n{{- else if eq .Role \"tool\" }}[TOOL_RESULTS]{\"content\": {{ .Content }}}[/TOOL_RESULTS]\n{{- end }}\n{{- end }}\"\"\"\n```",
+      "createdAt": "2025-05-30T14:25:11Z",
+      "url": "https://github.com/OpenHands/OpenHands/issues/8805#issuecomment-2922545480"
+    },
+    {
+      "id": "IC_kwDOLfkiw86uNO-X",
+      "author": {
+        "login": "enyst",
+        "is_bot": false
+      },
+      "authorAssociation": "MEMBER",
+      "body": "As noted in the linked issue, we have found devstral to work better without native tool use. I don't know what kind of issues were there, but now that you see errors, I do wonder if errors from litellm may well be related to it. 🤔",
+      "createdAt": "2025-05-30T15:28:09Z",
+      "url": "https://github.com/OpenHands/OpenHands/issues/8805#issuecomment-2922704791"
+    },
+    {
+      "id": "IC_kwDOLfkiw86uNTSC",
+      "author": {
+        "login": "lowlyocean",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "In your results spreadsheet, none of the native function calling models are ones that are locally run in Ollama. Do you have a single Ollama model that's known to work with OpenHands while LLM_NATIVE_TOOL_CALLING  is true? That would help narrow down if it's a model-specific issue, or a more general issue with how LiteLLM is being used by OpenHands",
+      "createdAt": "2025-05-30T15:35:43Z",
+      "url": "https://github.com/OpenHands/OpenHands/issues/8805#issuecomment-2922722434"
+    },
+    {
+      "id": "IC_kwDOLfkiw860Xsv_",
+      "author": {
+        "login": "github-actions[bot]",
+        "is_bot": true
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "body": "This issue is stale because it has been open for 30 days with no activity. Remove stale label or comment or this will be closed in 7 days.",
+      "createdAt": "2025-07-02T02:12:05Z",
+      "url": "https://github.com/OpenHands/OpenHands/issues/8805#issuecomment-3026111487"
+    },
+    {
+      "id": "IC_kwDOLfkiw867hiGI",
+      "author": {
+        "login": "github-actions[bot]",
+        "is_bot": true
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "body": "This issue is stale because it has been open for 30 days with no activity. Remove stale label or comment or this will be closed in 7 days.",
+      "createdAt": "2025-08-02T02:13:13Z",
+      "url": "https://github.com/OpenHands/OpenHands/issues/8805#issuecomment-3146129800"
+    },
+    {
+      "id": "IC_kwDOLfkiw869qMNK",
+      "author": {
+        "login": "github-actions[bot]",
+        "is_bot": true
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "body": "This issue was automatically closed due to 50 days of inactivity. We do this to help keep the issues somewhat manageable and focus on active issues.",
+      "createdAt": "2025-08-13T02:12:24Z",
+      "url": "https://github.com/OpenHands/OpenHands/issues/8805#issuecomment-3181953866"
+    }
+  ]
+}

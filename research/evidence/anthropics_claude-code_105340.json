@@ -1,0 +1,62 @@
+{
+  "number": 105340,
+  "title": "[MODEL] Model fabricates <task-notification> and Monitor events in its own output, then reports results from them",
+  "state": "OPEN",
+  "createdAt": "2026-10-27T04:33:37Z",
+  "author": {
+    "login": "netbrah",
+    "is_bot": false
+  },
+  "labels": [
+    {
+      "id": "LA_kwDON91aY88AAAAB6DeeSQ",
+      "name": "bug",
+      "description": "Something isn't working",
+      "color": "FF6B80"
+    },
+    {
+      "id": "LA_kwDON91aY88AAAAB6izDWw",
+      "name": "platform:macos",
+      "description": "Issue specifically occurs on macOS",
+      "color": "93A5FF"
+    },
+    {
+      "id": "LA_kwDON91aY88AAAAB_vit9Q",
+      "name": "area:model",
+      "description": "",
+      "color": "ededed"
+    },
+    {
+      "id": "LA_kwDON91aY88AAAAB_vlSHg",
+      "name": "area:core",
+      "description": "",
+      "color": "ededed"
+    }
+  ],
+  "url": "https://github.com/anthropics/claude-code/issues/105340",
+  "body": "### Preflight Checklist\n\n- [x] I have searched existing issues for similar behavior reports. The closest are #66700 and #80235, both closed; related open issues are #85215 and #81955.\n- [x] This report does NOT contain sensitive information (API keys, passwords, etc.)\n\n### Type of Behavior Issue\n\nOther unexpected behavior\n\n### What You Asked Claude to Do\n\nShip a plugin release, run a roughly 10-minute acceptance script in the background, and report the result.\n\n### What Claude Actually Did\n\nFour times in one session, while waiting on background work, Claude wrote fake harness notifications into its own assistant output and then acted on them. Each fake had the `[SYSTEM NOTIFICATION - NOT USER INPUT]` preamble, `<task-notification>` tags and a plausible `toolu_…` ID.\n\n1. **A fake background-task completion.** Claude launched a background Bash job (tool_use_id ending `…62po`).\n   - It then emitted a `<task-notification>` for that task, with an invented tool_use_id ending `…vC7M`, saying the task \"completed (exit code 0)\".\n   - It treated the notice as real, found the script still running, and told me the harness had sent a *premature* notification.\n   - The session log contains exactly one real notification for that task, with the correct ID, 9 minutes later. The fabricated one appears nowhere in the session JSONL: no queue-operation, user or attachment record.\n2. **Fake Monitor events.** Claude armed a Monitor on the still-running script, then wrote two fake Monitor events: all markers present, then \"script exited 0\". It reported \"Both parts pass\". At that moment one sub-agent was still running and the second part hadn't started.\n3. **A repeat right after promising not to.** Claude acknowledged (2) and said it would not write events itself. It ended the same message with another fake Monitor event claiming the second part passed.\n4. **A placeholder Workflow result.** Hours later, Claude ended a message with a fake Workflow completion notification whose result array was literal `\"...\"` placeholders. The real notification hadn't arrived yet.\n\nThe real results eventually matched the fabricated ones in (1) to (3), which made this easy to miss. In (1), Claude also blamed the harness for its own fabrication.\n\n### Expected Behavior\n\nClaude should never emit notification or system markup. It should end the turn, wait for the harness's real events, and report only results it read from disk or from tool output.\n\n### Files Affected\n\nNone modified by the fabrications, but the release's verification status was misreported for several minutes.\n\n### Permission Mode\n\nAccept Edits was ON (auto-accepting changes). The session ran in bypass permissions mode.\n\n### Can You Reproduce This?\n\nSometimes (intermittent)\n\n### Steps to Reproduce\n\n1. In a long session, start a background Bash job, or a Monitor or Workflow, that runs for several minutes.\n2. Let the model keep working while it waits.\n3. Sometimes it writes a `<task-notification>` or Monitor event in its own reply, often with a made-up tool_use_id, and reports the result from it.\n\n### Claude Model\n\nOpus\n\n### Relevant Conversation\n\nClaude Opus 5.5 (`claude-opus-5-5`). Session `5898bf01-7a3d-479c-a251-95025806fd35`, on 2026-10-26, at about 08:40–08:45 UTC and at 19:19:57 UTC. In the session JSONL, the real notifications appear as queue-operation and user records; the fabricated blocks appear only in assistant records.\n\n### Impact\n\nMedium - Extra work to undo changes\n\n### Claude Code Version\n\n2.1.304\n\n### Platform\n\nOther\n\n### Additional Context\n\n- The API went through a gateway, so `/feedback` was unavailable; that's why this is filed here.\n- macOS, Homebrew cask, background session.\n- Suggestion: the harness could detect `<task-notification>` or `[SYSTEM NOTIFICATION` framing in assistant output, and visibly flag or strip it.\n",
+  "comments": [
+    {
+      "id": "IC_kwDON91aY88AAAABoN8mIQ",
+      "author": {
+        "login": "Username2481632",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "Two more specimens, both on Linux with `claude-opus-5-5`, both right after launching a background subagent with the Agent tool. They add three things to the report above: the fabricated results did not match the real ones; one invented claim outlived its session in a memory file; and in one case Claude Code itself withdrew the fabricated response, because the tool call it claimed did not parse.\n\n**1. Kept in the session JSONL (2.1.322, 2026-11-11, session `86bab0cb-f84a-4bcd-bb37-67d1c2cca300`).**\n\n- 67 s after the Agent launch returned, assistant message `msg_011CgweSNAXtZx4E9XFRxnTJ` (18:54:01 UTC) contained a 16,900-character text block opening `<system-reminder>\\n<task-notification>\\n<task-id>…`, with the real task id and a full invented `<result>` report.\n- The same message also carried a valid Bash `tool_use`, so the response was well-formed and was kept.\n- The real notification for that agent arrived 18 minutes later (19:12:24), as a user record, with a different report.\n- The invented report's specifics were largely wrong: version numbers, a config default, file and line references.\n- What came of it: the session's own tool results, straight afterwards, contradicted those specifics, and the model worked from the tool results without ever remarking on the block. One claim survived, though. It appears only in the invented report and nothing in the session measured it, yet it was later written into a Claude Code auto-memory file as fact and repeated in the session's final report to me. I have since corrected the file.\n- Form: the real notifications in both sessions carry `<tool-use-id>`, `<output-file>` and `<summary>`; this block has none of them, has no `[SYSTEM NOTIFICATION` preamble, repeats a `<total_tokens>` element about a hundred times inside `<usage>`, and closes with a mismatched `</task-system-reminder>`.\n\n**2. Withdrawn by Claude Code (2.1.325, 2026-11-14, session `bb495143-e813-4f4e-81d4-553c4c5f73f3`).**\n\n- The first request after the Agent launch (sent 21:05:14 UTC, answered 21:05:46) returned text shaped as a `<task-notification>`: the real task id, an invented `tool-use-id`, `<status>completed</status>` and an invented report. It had `stop_reason: tool_use` and no parseable tool call.\n- Claude Code treated that response as malformed. The session JSONL has no record of it, only the retry row at 21:05:46.387 (\"The previous response failed to produce a valid tool call. Please retry the tool call now.\") carrying its uuid in `retractedMessageUuids`. The retried response was normal.\n- How I know what it contained: a plugin I run that redraws the transcript view kept the withdrawn response on screen, and I read it there; I have a screenshot of it. The stock view removes it.\n- The real notification came at 21:32, 26 minutes after the fabricated one, with a different report. The invented report described a function that does not exist in the project.\n\nWhat the pair shows for the detection suggestion at the end of the report:\n\n- The second fabrication was removed only because the response claimed a tool call (`stop_reason: tool_use`) that did not parse. A fabrication in a response that carries a valid tool call, as the first did, or that simply ends the turn, as items 3 and 4 of the report did, is kept.\n- Of the two patterns suggested, only `<task-notification>` matches the first block; it has no `[SYSTEM NOTIFICATION` text.\n- In both sessions the real notifications are user records, never assistant text, and both tasks were still running when the fabricated one appeared. So a check could go by who wrote the text and whether the task has finished, rather than by text patterns.\n",
+      "createdAt": "2026-11-18T22:49:57Z",
+      "url": "https://github.com/anthropics/claude-code/issues/105340#issuecomment-6993946145"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABoOrCsQ",
+      "author": {
+        "login": "Username2481632",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "A related form on 2.1.327 with `claude-fable-5-2`, in case the request ids help: the model's whole reply is a copy of the wrapper Claude Code puts around a task notification, with no invented result.\n\nSession `f5ed583a-95e5-426c-9b15-cb7927d763dc`, main thread, 2026-11-18 UTC. Five replies, each a single text block with no thinking, `stop_reason: end_turn`:\n\n| time | request id | output tokens | text |\n|---|---|---|---|\n| 22:17:19 | `req_011ChBAgbQSKPxcGkAAQ7GeG` | 64 | `<system-reminder>`, `[SYSTEM NOTIFICATION - NOT USER INPUT]`, `This is an automated background-task event, NOT a message from the user.`, `</system-reminder>` |\n| 22:27:29 | `req_011ChBBTa2bhisGQ7dnFyzpd` | 44 | `<system-reminder>`, `[SYSTEM NOTIFICATION - NOT USER INPUT]`, `</system-reminder>` |\n| 22:38:04 | `req_011ChBCGVqtFfG99G6LVUUwf` | 44 | same |\n| 22:49:54 | `req_011ChBDAmUBoco6pRDFcJCnE` | 44 | same |\n| 23:05:39 | `req_011ChBENVXhLFFVVyPAzezEv` | 44 | same |\n\nWhat the requests looked like:\n\n- Each reply came at the end of a turn, several tool rounds in, while a background subagent of the session was still running. The message just before it was a tool result: an Agent launch result three times, a Bash result once, a SendMessage result once.\n- For the first copy, the turn before had ended with no assistant text. So in the request that opened its turn, the last tool result and the incoming task notification sat in one user message, with no assistant turn between them: the tool result ran straight into the wrapper.\n- From the second copy on, that was not the case. The previous copy was itself in the conversation as an assistant turn, and the notification was its own user message.\n- Context at those requests was 760K to 825K tokens. I have not separated context size from this conversation's content as the trigger.\n\nOn the detection suggestion: 2.1.327 already scans main-thread assistant text for this kind of content and sends a telemetry event, `tengu_assistant_output_harness_content`. As far as I can read the code path, that is all it does: the text is not stripped or flagged, and nothing is retried.\n\nOne earlier specimen matches neither pattern the report suggests, since it has no `<task-notification>` and no `[SYSTEM NOTIFICATION`. On 2.1.302 with `claude-opus-5-5`, session `c891dafc-97d6-42ca-bd0f-374ae2743bf8`, `req_011Cg9tSmZedGafRtJxz4i4n`, 2026-10-18 14:49:18 UTC, three seconds after an Agent launch returned, the text block read `<system-reminder>The agent's result has been delivered as a task notification. Assistant turns written while it was running: none.</system-reminder>`. The same message carried a tool call to read queued notifications, which found none.\n",
+      "createdAt": "2026-11-18T23:28:55Z",
+      "url": "https://github.com/anthropics/claude-code/issues/105340#issuecomment-6994707121"
+    }
+  ]
+}

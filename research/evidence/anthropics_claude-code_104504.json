@@ -1,0 +1,84 @@
+{
+  "number": 104504,
+  "title": "[MODEL] \"Tests pass\" reported from a stale or piped run (measured across 150 sessions)",
+  "state": "OPEN",
+  "createdAt": "2026-10-23T06:48:07Z",
+  "author": {
+    "login": "Ashwinsuriya",
+    "is_bot": false
+  },
+  "labels": [
+    {
+      "id": "LA_kwDON91aY88AAAAB6DeeSQ",
+      "name": "bug",
+      "description": "Something isn't working",
+      "color": "FF6B80"
+    },
+    {
+      "id": "LA_kwDON91aY88AAAAB_vit9Q",
+      "name": "area:model",
+      "description": "",
+      "color": "ededed"
+    },
+    {
+      "id": "LA_kwDON91aY88AAAACBm2mcg",
+      "name": "area:bash",
+      "description": null,
+      "color": "ededed"
+    },
+    {
+      "id": "LA_kwDON91aY88AAAACJhPJJA",
+      "name": "model",
+      "description": "",
+      "color": "ededed"
+    }
+  ],
+  "url": "https://github.com/anthropics/claude-code/issues/104504",
+  "body": "### Preflight Checklist\n\n- [x] I have searched [existing issues](https://github.com/anthropics/claude-code/issues?q=is%3Aissue%20state%3Aopen%20label%3Amodel) for similar behavior reports\n- [x] This report does NOT contain sensitive information (API keys, passwords, etc.)\n\n### Type of Behavior Issue\n\nClaude made incorrect assumptions about my project\n\n### What You Asked Claude to Do\n\nNormal coding tasks in Claude Code. \"fix the failing test\", then a follow-up change in the same file, then \"is it done?\". Across 150 of our real sessions, Claude was asked to make code changes and confirm they work.\n\n### What Claude Actually Did\n\nClaude reported \"all tests pass\" when no up-to-date run backed it. We labelled 357 such claims from 150 Claude Code sessions against the session JSONL (commands, exit codes, file edits, timestamps):\n- 178 backed by a matching run, 80 with no run backing them, 92 couldn't be checked either way, 5 contradicted by the record, 2 other.\n- Of the 36 unbacked claims in our development set, 32 were stale: tests passed earlier, Claude edited code again, then reported the old pass as current. 3 were narrowed runs (e.g. -k, one file) reported as the full suite; 1 had no run at all.\n- 1,514 of 2,084 test runs (73%) were piped through `tail` or `head`. Without `set -o pipefail`, the exit status is tail's, so a failing run exits 0, and Claude reads \"passed\" from the visible output.\n\nLabels had a second-rater check (Cohen's kappa 0.97 / 0.82 / 0.69 across three label levels). These are one team's sessions, not a population estimate.\n\n### Expected Behavior\n\n- If any file was edited after the last test/build run, re-run before saying it passes, or say the pass is from before the edit.\n- When piping test/build output, use `set -o pipefail` (or don't pipe) and report the real exit code.\n- When a run was narrowed (-k, a single file, --testNamePattern), say so in the claim instead of \"all tests pass\".\n\n### Files Affected\n\n```shell\n\n```\n\n### Permission Mode\n\nAccept Edits was ON (auto-accepting changes)\n\n### Can You Reproduce This?\n\nSometimes (intermittent)\n\n### Steps to Reproduce\n\nStale pass:\n1. Ask Claude Code to fix a failing test. It runs the suite and sees a pass.\n2. Ask for a further change in the same file.\n3. Claude edits and replies \"done, all tests pass\" without re-running.\n\nPiped exit:\n1. In a project with one failing test, let Claude run tests the way it usually does, e.g. `npm test 2>&1 | tail -20`.\n2. The command exits 0 because of the pipe.\n3. Claude reports success when the visible tail reads like a passing summary.\n\n### Claude Model\n\nOpus\n\n### Relevant Conversation\n\n```markdown\n\n```\n\n### Impact\n\nMedium - Extra work to undo changes\n\n### Claude Code Version\n\n2.1.304 (Claude Code)\n\n### Platform\n\nAnthropic API\n\n### Additional Context\n\n_No response_",
+  "comments": [
+    {
+      "id": "IC_kwDON91aY88AAAABe5MPXQ",
+      "author": {
+        "login": "aldi949",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "@Ashwinsuriya The stale-pass cases are exactly the kind of failure I've been investigating.\n\nOne thing I find especially interesting is that a successful test run isn't necessarily evidence of completion if the source changed afterward. And a narrowed run shouldn't count as proof that the full suite passed.\n\nI've been building an experimental completion verifier called Truth Firewall, but it currently checks declared conditions against the current state — it doesn't yet handle historical Claude session records.\n\nWould you be open to sharing one small sanitized stale-pass case? I'd be interested in testing the boundary against an actual failure instead of another case I invented myself.",
+      "createdAt": "2026-10-23T15:15:54Z",
+      "url": "https://github.com/anthropics/claude-code/issues/104504#issuecomment-6368202589"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABjqhSng",
+      "author": {
+        "login": "PrimeFoldTools",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "The tail finding is the big one. Put set -o pipefail in front of any test command the agent runs, and ask it to paste the summary line and echo $? in the same message as the claim. For stale passes, ask for the run time and the last-edit time. A run older than the edit is no pass. I built Andon (free, open source), a Stop hook whose opt-in mode refuses a piped run without pipefail. It still credits a run from before the last edit. https://github.com/PrimeFoldTools/Andon",
+      "createdAt": "2026-11-06T15:22:16Z",
+      "url": "https://github.com/anthropics/claude-code/issues/104504#issuecomment-6688363166"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABj8AjxA",
+      "author": {
+        "login": "kennywu411-dev",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "The stale pass is the one I run into most too. Claude runs the tests, they pass, it makes one more edit, then says \"all tests pass\" without running them again.\n\nAdding a line to CLAUDE.md helped a bit (rerun if you touched any file since the last test run, and say which tests you ran if it was only some of them). It still forgets sometimes though.\n\nSo I wrote a Stop hook for it, called honestly (I'm the author, it's MIT, plain Python, no model calls). Before the reply goes out it checks whether tests actually ran after the last edit and what the summary line says, so `npm test | tail` printing \"1 failed\" gets caught even though the exit code is 0. It also blocks pipes like `| head` or `| grep -c` that hide the summary from Claude in the first place.\n\nOn my own sessions from the last 60 days it held 12 replies, and 11 of those really had nothing behind them.\n\nhttps://github.com/kennywu411-dev/honestly\n",
+      "createdAt": "2026-11-07T12:04:16Z",
+      "url": "https://github.com/anthropics/claude-code/issues/104504#issuecomment-6706701252"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABj-r7hA",
+      "author": {
+        "login": "PrimeFoldTools",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "Update to my comment above: Andon's opt-in tool mode (`CLAIM_CHECK_EVIDENCE=tool`) no longer credits a run from before the last edit. If an Edit, Write, MultiEdit or NotebookEdit call comes after the passing run, that run stops counting until the tests run again. It still can't see files changed through Bash (`sed -i`, a script). Change: https://github.com/PrimeFoldTools/Andon/pull/27",
+      "createdAt": "2026-11-07T16:04:22Z",
+      "url": "https://github.com/anthropics/claude-code/issues/104504#issuecomment-6709508996"
+    }
+  ]
+}

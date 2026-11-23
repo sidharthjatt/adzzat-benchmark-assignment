@@ -1,0 +1,27 @@
+{
+  "number": 19765,
+  "title": "tool calls sometimes fail because the model emits truncated JSON in `function_call.arguments`",
+  "state": "OPEN",
+  "createdAt": "2026-04-27T04:37:06Z",
+  "author": {
+    "login": "hac425xxx",
+    "is_bot": false
+  },
+  "labels": [
+    {
+      "id": "LA_kwDOOYsS4c8AAAAB94x95A",
+      "name": "bug",
+      "description": "Something isn't working",
+      "color": "d73a4a"
+    },
+    {
+      "id": "LA_kwDOOYsS4c8AAAACOt-wYg",
+      "name": "tool-calls",
+      "description": "Issues related to tool calling",
+      "color": "f34e5d"
+    }
+  ],
+  "url": "https://github.com/openai/codex/issues/19765",
+  "body": "### What version of Codex CLI is running?\n\n`codex-cli 0.125.0`\n\n### What subscription do you have?\n\npro\n\n### Which model were you using?\n\n_No response_\n\n### What platform is your computer?\n\n_No response_\n\n### What terminal emulator and version are you using (if applicable)?\n\n_No response_\n\n### What issue are you seeing?\n\n\nWhen Codex runs with a weaker model, tool calls sometimes fail because the model emits truncated JSON in `function_call.arguments`.\n\nThe user-visible symptom is a log/error like:\n\n```text\ncodex_core::tools::router: error=failed to parse function arguments: EOF while parsing a string at line ...\n```\n\nFrom local source inspection, the root issue is not in `tools::router` itself. The router is only where the error gets logged while dispatching the tool call. The main parse failure comes from tool handlers that do `serde_json::from_str(arguments)`, especially the shared handler path in `codex-rs/core/src/tools/handlers/mod.rs`, with parallel copies in:\n\n- `codex-rs/core/src/tools/handlers/plan.rs`\n- `codex-rs/core/src/tools/code_mode/wait_handler.rs`\n- `codex-rs/core/src/tools/handlers/mcp_resource.rs`\n\nCodex already converts this into a `FunctionCallOutput` and gives the model another chance to continue, but weaker models often do not reliably self-repair after receiving the generic parse error. In practice this causes repeated malformed calls or turn failure instead of robust recovery.\n\n## What steps can reproduce the bug?\n\n1. Run Codex CLI on a task that requires multiple tool calls.\n2. Use a weaker / less reliable tool-calling model.\n3. Let the model produce a function call with a long string argument, nested JSON, or partially streamed JSON object.\n4. Observe that the model sometimes sends truncated JSON in `arguments`, for example a half-closed string or object.\n5. Codex logs an error like:\n\n```text\nfailed to parse function arguments: EOF while parsing a string at line ...\n```\n\n6. The model receives the tool error, but may fail to re-emit a valid tool call and can get stuck or fail the turn.\n\nMinimal malformed example shape:\n\n```json\n{\"cmd\":\"echo hello\n```\n\n## What is the expected behavior?\n\nCodex should recover more reliably from malformed tool-call JSON produced by weaker models.\n\nAt minimum:\n\n1. The parse error returned to the model should explicitly say that the JSON arguments were truncated and that the model must re-emit the full tool call with a complete JSON object.\n2. That guidance should be consistent across all function-tool argument parsers, not only some handlers.\n3. The error should make it obvious that this is a model-output/tool-arguments problem, not a router bug.\n\n## Additional information\n\nRelevant code paths from the current source tree:\n\n- `codex-rs/core/src/tools/handlers/mod.rs`\n- `codex-rs/core/src/tools/handlers/plan.rs`\n- `codex-rs/core/src/tools/code_mode/wait_handler.rs`\n- `codex-rs/core/src/tools/handlers/mcp_resource.rs`\n- `codex-rs/core/src/stream_events_utils.rs`\n- `codex-rs/core/src/tools/router.rs`\n\nObserved local source revision during analysis:\n\n`0ccd659b4`\n\nSuggested fix direction:\n\n- Keep the current behavior of returning a `FunctionCallOutput` back to the model.\n- Improve the returned error text for `serde_json::Error` in the `EOF` category so it explicitly instructs the model to resend the full JSON object.\n- Unify that behavior in the shared parser and the current parser bypasses listed above.\n- Avoid automatic JSON “repair” for shell/exec/apply-patch style tools, because silent repair of truncated arguments could mutate intent.\n\n### What steps can reproduce the bug?\n\nx\n\n### What is the expected behavior?\n\n_No response_\n\n### Additional information\n\n_No response_",
+  "comments": []
+}

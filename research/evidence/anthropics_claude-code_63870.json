@@ -1,0 +1,327 @@
+{
+  "number": 63870,
+  "title": "[BUG] Bash tool calls emitted as raw <invoke> text instead of executing",
+  "state": "OPEN",
+  "createdAt": "2026-05-30T05:36:29Z",
+  "author": {
+    "login": "atwoodwang",
+    "is_bot": false
+  },
+  "labels": [
+    {
+      "id": "LA_kwDON91aY88AAAAB6DeeSQ",
+      "name": "bug",
+      "description": "Something isn't working",
+      "color": "FF6B80"
+    },
+    {
+      "id": "LA_kwDON91aY88AAAAB6DeeTQ",
+      "name": "duplicate",
+      "description": "This issue or pull request already exists",
+      "color": "888888"
+    },
+    {
+      "id": "LA_kwDON91aY88AAAAB6NHLcw",
+      "name": "has repro",
+      "description": "Has detailed reproduction steps",
+      "color": "ededed"
+    },
+    {
+      "id": "LA_kwDON91aY88AAAAB6izDWw",
+      "name": "platform:macos",
+      "description": "Issue specifically occurs on macOS",
+      "color": "93A5FF"
+    },
+    {
+      "id": "LA_kwDON91aY88AAAAB_vit9Q",
+      "name": "area:model",
+      "description": "",
+      "color": "ededed"
+    },
+    {
+      "id": "LA_kwDON91aY88AAAACBm2mcg",
+      "name": "area:bash",
+      "description": null,
+      "color": "ededed"
+    }
+  ],
+  "url": "https://github.com/anthropics/claude-code/issues/63870",
+  "body": "### Preflight Checklist\n\n- [x] I have searched existing issues. Similar reports exist (#61122, #61367, #62344, #63616), but this report adds detailed JSONL evidence from one session with 23 malformed Bash calls.\n- [x] This is a single bug report (please file separate reports for different bugs)\n- [x] I am using the latest version of Claude Code available to me (`2.1.158 (Claude Code)` currently installed). The affected transcript contains failures on both `2.1.156` and `2.1.158`.\n\n### What's Wrong?\n\nIn a long Claude Code session, intended Bash tool calls were intermittently emitted as ordinary assistant text instead of structured `tool_use` objects. The UI showed raw invoke text like:\n\n```text\ncall\n<invoke name=\"Bash\">\n<parameter name=\"command\">...</parameter>\n<parameter name=\"description\">...</parameter>\n<parameter name=\"dangerouslyDisableSandbox\">true</parameter>\n</invoke>\n```\n\nBecause these records are plain `text` content instead of structured `tool_use`, Claude Code does not dispatch the Bash command. There is no `tool_use_id` and no matching `tool_result`.\n\nThis caused repeated false progress in one repo workflow: commits, verification commands, pushes, PR creation, PR merge, and cleanup commands were printed but not actually executed.\n\nImportant detail from the JSONL: one affected assistant message has `stop_reason = \"tool_use\"`, but its content still contains only ordinary text and no `tool_use` object.\n\n### What Should Happen?\n\nWhen Claude intends to run Bash, Claude Code should receive a structured `tool_use` object, execute the command, and append a matching `tool_result`.\n\nIf the model emits malformed tool-call text, Claude Code should surface an explicit parsing/tool-call error or reprompt internally. Raw `<invoke name=\"...\">` blocks should not be rendered as normal assistant prose or fed back into future context where they may cause cascading failures.\n\n### Error Messages/Logs\n\n```shell\nNo shell error is shown, because the command is never dispatched.\n\nRepresentative malformed JSONL shape:\n\n{\n  \"type\": \"assistant\",\n  \"message\": {\n    \"content\": [\n      {\n        \"type\": \"text\",\n        \"text\": \"...\\\\n\\\\ncall\\\\n<invoke name=\\\"Bash\\\">\\\\n<parameter name=\\\"command\\\">MAIN=...\\\\n...</parameter>\\\\n<parameter name=\\\"description\\\">Pull merged main and verify files</parameter>\\\\n<parameter name=\\\"dangerouslyDisableSandbox\\\">true</parameter>\\\\n</invoke>\"\n      }\n    ],\n    \"stop_reason\": \"end_turn\"\n  }\n}\n\nThere is no tool_use object, no tool_use_id, and no following tool_result.\n```\n\n### Steps to Reproduce\n\nThis is intermittent, but the affected local transcript provides a concrete session-level reproduction/evidence trail:\n\n1. Use Claude Code on macOS with Opus in a long repository workflow involving repeated Bash calls.\n2. In the affected session, ask Claude to perform normal git/test/PR workflow actions such as commit, verify, push, create PR, merge PR, and cleanup.\n3. After the session becomes long-context, observe that some intended Bash calls are printed to the conversation as raw text beginning with `call` and `<invoke name=\"Bash\">`.\n4. Inspect the session JSONL and compare normal versus malformed turns:\n   - Normal: `content[].type = \"tool_use\"`, `name = \"Bash\"`, has `id`, followed by matching `tool_result`.\n   - Malformed: `content[].type = \"text\"` containing raw `<invoke name=\"Bash\">...`, no `tool_use_id`, no matching `tool_result`.\n5. Verify downstream state: earlier printed commands had no effect. In this transcript, later turns confirm commit was not made, regression log did not exist, remote branch was absent, PR was not created, PR stayed open, and cleanup was not done.\n\nConcrete analyzed transcript:\n\n- Project: `texas-holdem-poker-recorder`\n- Session id: `1931487f-0ac9-47fe-b759-5ba244821147`\n- Local JSONL path pattern: `<home>/.claude/projects/-Users-<user>-playground-texas-holdem-poker-recorder/1931487f-0ac9-47fe-b759-5ba244821147.jsonl`\n\nJSONL evidence summary:\n\n- Total JSONL lines analyzed: 2,233\n- Normal assistant structured tool uses: 347\n- Normal tool results: 347\n- Malformed raw invoke blocks: 23\n- Affected tool: `Bash`\n- All malformed blocks start with stray text `call` before `<invoke name=\"Bash\">`\n- First malformed block: `2026-05-29T15:22:53.436Z`\n- Last malformed block: `2026-05-30T04:45:09.672Z`\n- Versions:\n  - `2.1.156`: 22 malformed blocks\n  - `2.1.158`: 1 malformed block\n- `stop_reason` values:\n  - `end_turn`: 22\n  - `tool_use`: 1, but still no structured `tool_use` object\n- Affected turns had very high cache-read tokens, roughly 441k-489k, suggesting long-context state may be related.\n\nRepresentative affected turns:\n\n| JSONL line | Timestamp UTC | Version | stop_reason | Intended Bash description |\n|---:|---|---|---|---|\n| 1807 | 2026-05-29T15:22:53.436Z | 2.1.156 | tool_use | Commit temp-player fix |\n| 1908 | 2026-05-29T16:16:04.950Z | 2.1.156 | end_turn | Typecheck + component test + build after 2-card placeholder |\n| 2038 | 2026-05-29T16:32:17.752Z | 2.1.156 | end_turn | Push branch to origin |\n| 2081 | 2026-05-29T16:34:03.745Z | 2.1.156 | end_turn | Create PR with simple body |\n| 2115 | 2026-05-29T16:35:29.605Z | 2.1.156 | end_turn | Squash-merge PR #10 |\n| 2141 | 2026-05-30T04:35:29.478Z | 2.1.156 | end_turn | Pull merged main and verify files |\n| 2181 | 2026-05-30T04:45:09.672Z | 2.1.158 | end_turn | Update local main and verify final state |\n\n### Claude Model\n\nOpus\n\n### Is this a regression?\n\nYes, this worked in a previous version\n\n### Last Working Version\n\nUnknown. I started seeing this after updating around 2026-05-29. The analyzed transcript shows failures on `2.1.156` and still one occurrence after `2.1.158`.\n\n### Claude Code Version\n\n`2.1.158 (Claude Code)` currently installed.\n\nAffected transcript contains:\n\n- `2.1.156`: 22 malformed raw invoke blocks\n- `2.1.158`: 1 malformed raw invoke block\n\n### Platform\n\nAnthropic API\n\n### Operating System\n\nmacOS\n\n### Terminal/Shell\n\nOther (`zsh`; terminal app unknown from the JSONL)\n\n### Additional Information\n\nRelated public issues found before filing:\n\n- #49747: Opus mixes legacy XML tool-use format into JSON tool calls on longer payloads. This appears to be the broader/root issue. Later comments also describe full raw `<invoke>` blocks being rendered as visible text, missing `tool_use` despite `stop_reason = \"tool_use\"`, and continued reproduction on Opus 4.8.\n- #61122: Bash tool call rendered as raw XML instead of executing\n- #61367: Intermittent malformed tool calls emitted as plain text instead of structured `tool_use`, then cascades via retry\n- #62344: Malformed tool calls in long sessions due to in-context few-shot poisoning\n- #63616: Claude Code fails BASH invocations, reported on `2.1.156`\n\nSuggested investigation areas:\n\n- Add a client-side invariant: if `stop_reason = \"tool_use\"`, assistant content must contain at least one structured `tool_use` object.\n- Detect raw `<invoke name=\"...\">` blocks in assistant text and treat them as malformed tool calls.\n- Avoid feeding raw malformed tool-call text back into future context.\n- Investigate whether long-context sessions with high cache-read tokens increase the chance of malformed tool-call serialization.\n",
+  "comments": [
+    {
+      "id": "IC_kwDON91aY88AAAABERmedg",
+      "author": {
+        "login": "github-actions[bot]",
+        "is_bot": true
+      },
+      "authorAssociation": "NONE",
+      "body": "Found 3 possible duplicate issues:\n\n1. https://github.com/anthropics/claude-code/issues/61367\n2. https://github.com/anthropics/claude-code/issues/62344\n3. https://github.com/anthropics/claude-code/issues/60584\n\nThis issue will be automatically closed as a duplicate in 3 days.\n\n- If your issue is a duplicate, please close it and 👍 the existing issue instead\n- To prevent auto-closure, add a comment or 👎 this comment\n\n🤖 Generated with [Claude Code](https://claude.ai/code)",
+      "createdAt": "2026-05-30T05:42:50Z",
+      "url": "https://github.com/anthropics/claude-code/issues/63870#issuecomment-4581858934"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABEXWsPQ",
+      "author": {
+        "login": "jwlim94",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "fix it\n",
+      "createdAt": "2026-05-31T19:50:23Z",
+      "url": "https://github.com/anthropics/claude-code/issues/63870#issuecomment-4587891773"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABEYa3cQ",
+      "author": {
+        "login": "TIANQIAN1238",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "hey COME here and fix it \n\nit sucks",
+      "createdAt": "2026-06-01T02:01:27Z",
+      "url": "https://github.com/anthropics/claude-code/issues/63870#issuecomment-4589008753"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABEpZQcQ",
+      "author": {
+        "login": "szichedelic",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "please fix this, it sucks",
+      "createdAt": "2026-06-02T20:36:45Z",
+      "url": "https://github.com/anthropics/claude-code/issues/63870#issuecomment-4606808177"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABEqv-Yw",
+      "author": {
+        "login": "TIANQIAN1238",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "> please fix this, it sucks\n\nYou also encountered this situation, right?\n\nI tried to reproduce and troubleshoot it, but I found that it might be an issue on the model side.",
+      "createdAt": "2026-06-03T01:08:27Z",
+      "url": "https://github.com/anthropics/claude-code/issues/63870#issuecomment-4608228963"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABEq0Mpw",
+      "author": {
+        "login": "szichedelic",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "> > please fix this, it sucks\n> \n> You also encountered this situation, right?\n> \n> I tried to reproduce and troubleshoot it, but I found that it might be an issue on the model side.\n\nYes certain convos it happens constantly even on auto mode and it is blocking.  It won't stop making the mistake and when prompted, Claude mentioned that it is a problem on the model side and that it can't help itself even though the correct tool call is committed to its memory.",
+      "createdAt": "2026-06-03T01:25:16Z",
+      "url": "https://github.com/anthropics/claude-code/issues/63870#issuecomment-4608298151"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABEzsYAA",
+      "author": {
+        "login": "Sora-bluesky",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "+1 — reproducing the same symptom right now in a long-context session.\n\n**Environment**\n- Model: `claude-opus-4-8` (1M context)\n- Claude Code (Cowork mode / Code tab)\n- Session: ~200k+ tokens of cached context (long article-writing workflow)\n\n**Symptom**\nAcross this single session, repeated malformed tool calls with the literal text `count` appearing right before `<invoke name=\"...\">`. Failures cluster on `Write` and `Edit` for large HTML content (130+ lines), and also hit `Read` after long free-text preambles. Retries with shorter preambles sometimes succeed, matching the pattern described in #64112.\n\n**Reproduction trigger (consistent)**\n1. Long session (cache-read tokens high)\n2. Assistant generates a several-sentence preamble explaining intent\n3. Assistant then attempts a `Write` with a long `content` parameter\n4. The tool call is emitted as raw text starting with `count<invoke name=\"Write\">...`\n5. Harness returns \"Your tool call was malformed and could not be parsed. Please retry.\"\n6. Once it happens, it tends to recur within the same session (consistent with the in-context few-shot poisoning hypothesis in #62344)\n\n**Workaround that helped (not a fix)**\nSwitching to `claude-opus-4-7` mid-session reduced the recurrence, consistent with #64774's finding that 4.7 and Sonnet 4.6 have ~0% failure rate while 4.8 is ~1.5%.\n\n**Practical impact**\nCost me ~30 retries in one session, and forced a full architectural workaround: moving from \"assistant writes long HTML via `Write`\" to \"assistant writes short JSON data + a generator script\". Effectively gave up on Opus 4.8 for any task with long string parameters.\n\nFiling this as an additional data point. Adding the client-side invariant suggested in this issue (assert structured `tool_use` when `stop_reason == \"tool_use\"`) would at least surface the failure earlier instead of letting it cascade.",
+      "createdAt": "2026-06-03T23:39:08Z",
+      "url": "https://github.com/anthropics/claude-code/issues/63870#issuecomment-4617607168"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABFigdMg",
+      "author": {
+        "login": "amber-lzz",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "it disturbe me too",
+      "createdAt": "2026-06-10T04:59:28Z",
+      "url": "https://github.com/anthropics/claude-code/issues/63870#issuecomment-4666694962"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABFtU6nw",
+      "author": {
+        "login": "novacoole",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "Happening frequently for me with Fable 5.",
+      "createdAt": "2026-06-11T07:05:18Z",
+      "url": "https://github.com/anthropics/claude-code/issues/63870#issuecomment-4678040223"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABF0o3oA",
+      "author": {
+        "login": "teastburn",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "In my case, I was using an organization login that had denied all tool calls. Ensure in `/permissions` there isn't a `*` under the `Deny` section. Or something similar. Also beware: **Claude code would hallucinate tool outputs in this failure mode**!",
+      "createdAt": "2026-06-11T22:40:47Z",
+      "url": "https://github.com/anthropics/claude-code/issues/63870#issuecomment-4685707168"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABGF4rzQ",
+      "author": {
+        "login": "qoosdd89382",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "Still there. Can you please fix it? It's ridiculous...",
+      "createdAt": "2026-06-15T01:29:28Z",
+      "url": "https://github.com/anthropics/claude-code/issues/63870#issuecomment-4703792077"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABGINAtA",
+      "author": {
+        "login": "wenqihuang",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "It happens more than 50% of all cmd calls to me, which is extremely annoying. please fix it.",
+      "createdAt": "2026-06-15T08:58:34Z",
+      "url": "https://github.com/anthropics/claude-code/issues/63870#issuecomment-4706222260"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABGeGqGA",
+      "author": {
+        "login": "hooyao",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "> It happens more than 50% of all cmd calls to me, which is extremely annoying. please fix it.\n\nWhen you first see this mistake, you need to rewind immediately; you cannot let the malformed <invoke> persist in the context window, otherwise the model will enforce this behavior and keep repeating this error.",
+      "createdAt": "2026-06-17T10:59:10Z",
+      "url": "https://github.com/anthropics/claude-code/issues/63870#issuecomment-4729186840"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABGgxO4g",
+      "author": {
+        "login": "axisrow",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "Hitting this repeatedly with **Opus 4.8** — honestly it's getting really frustrating.\n\nA Bash tool call gets emitted as raw `<invoke name=\"Bash\">...</invoke>` text in the transcript instead of executing. The command never runs; I have to re-issue it. It's intermittent but frequent enough to break flow during multi-step work (repeated git/gh and pytest calls).\n\nNotably, it happened **twice in a row while the agent was trying to post this very comment** — the `gh issue comment` tool call itself leaked as raw `<invoke>` text and did not execute, both times. So the bug reproduces *on the act of reporting the bug*.\n\nEnv:\n- Claude Code 2.1.179\n- macOS 26.5.1 (arm64)\n- Model: Opus 4.8\n\nMatches #67307 (Opus 4.8 specifically). +1 — would appreciate prioritization.",
+      "createdAt": "2026-06-17T15:03:59Z",
+      "url": "https://github.com/anthropics/claude-code/issues/63870#issuecomment-4731981538"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABGgzwdg",
+      "author": {
+        "login": "axisrow",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "**Update — same session, bug fired again (and clustered):**\n\nRight after the comment above, the bug misfired **again on a `gh pr merge` call** — also twice in a row — the tool call leaked as raw `<invoke name=\"Bash\">...</invoke>` text and the merge didn't run until the third attempt.\n\nSo in a single session it took multiple retries on **two separate commands** (posting this comment, then a merge) to get one Bash call to actually execute. The intermittency seems to **cluster**: once a call misfires, the next one or two tend to misfire too, then it recovers.\n\nEnv unchanged: Claude Code 2.1.179 / macOS 26.5.1 (arm64) / Opus 4.8. Same root cause as #67307.",
+      "createdAt": "2026-06-17T15:07:09Z",
+      "url": "https://github.com/anthropics/claude-code/issues/63870#issuecomment-4732022902"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABGlwDPw",
+      "author": {
+        "login": "manssorr",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "This is happening a lot for me lately!",
+      "createdAt": "2026-06-18T02:10:22Z",
+      "url": "https://github.com/anthropics/claude-code/issues/63870#issuecomment-4737205055"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABGmEEOQ",
+      "author": {
+        "login": "huohuli008",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "当持续使用较长上下文后，极容易出现，甚至到了连续失败的情况，只能通过Compact或Clear解决。",
+      "createdAt": "2026-06-18T03:24:46Z",
+      "url": "https://github.com/anthropics/claude-code/issues/63870#issuecomment-4737532985"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABGnh3dA",
+      "author": {
+        "login": "keinn51",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "help me!",
+      "createdAt": "2026-06-18T07:17:10Z",
+      "url": "https://github.com/anthropics/claude-code/issues/63870#issuecomment-4739069812"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABGoFJVw",
+      "author": {
+        "login": "xstreamka",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "I confirm that these errors happen all the time today.",
+      "createdAt": "2026-06-18T08:24:41Z",
+      "url": "https://github.com/anthropics/claude-code/issues/63870#issuecomment-4739647831"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABHBuRSA",
+      "author": {
+        "login": "axisrow",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "**Another repro, this time it killed a whole session (Linux, Opus 4.8).**\n\nSame root cause as my earlier reports: a Bash tool call leaks into the transcript as raw `<invoke name=\"Bash\">...` text instead of executing. I went back through the saved session transcript (`~/.claude/projects/<proj>/<id>.jsonl`) and the failure pattern is very clear.\n\n**Timeline within one session — 4 malformed-call events, in 2 clusters:**\n\n| Time (UTC) | Command being attempted | Outcome |\n|---|---|---|\n| 06:20:55 | `CI=true python3 -m pytest tests/...` | leaked as raw text, **retry succeeded** |\n| 06:21:19 | `gh pr checks 974 --watch` | leaked as raw text, **retry succeeded** |\n| 08:28:46 | `gh pr create` (multi-line body) | leaked as raw text, **retry FAILED** |\n| 08:29:50 | `gh pr create` (retry) | leaked as raw text, **retry FAILED → session stuck** |\n\nThe terminal entries in the transcript are literally:\n\n```\nThe model's tool call could not be parsed (retry also failed).\n```\n\ntwice in a row, after which the session could no longer make progress.\n\n**What the leaked block looks like in the transcript** — the tool call is emitted as assistant *text*, prefixed with a stray token (`call`) and truncated mid-stream:\n\n```\nTEXT:call\n<invoke name=\"Bash\">\n<parameter name=\"command\">cd <project-dir>\nCI=true python3 -m pytest tests/tes      <-- cut off here\n```\n\n**Confirms the clustering I reported before:** once a call misfires, the next one or two misfire too. Both failure clusters here are pairs of consecutive misfires; in the 06:20 cluster the retry recovered, in the 08:28 cluster it did not and the session was lost.\n\n**Common trigger in every misfire here:** `gh` / long multi-line Bash commands (pytest pipelines, `gh pr checks --watch`, and especially `gh pr create` with a multi-line body). Single short commands in the same session were fine.\n\nEnv:\n- Claude Code 2.1.183\n- Linux 5.15.0 (x86_64)\n- Model: Opus 4.8\n\nSo this is not macOS-specific — reproduces on Linux too, and is severe enough to end a session (not just cost a retry) when two consecutive `gh pr create` calls both misfire. Same family as #67307.\n",
+      "createdAt": "2026-06-22T08:52:20Z",
+      "url": "https://github.com/anthropics/claude-code/issues/63870#issuecomment-4766536008"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABHDke2Q",
+      "author": {
+        "login": "yuzeguitarist",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "Same here. I’m seeing this frequently with Opus 4.8[1m].\n\nThe model seems to intend a tool call, but the tool invocation leaks into the visible text as plain text instead of being emitted as a structured `tool_use`. The command is not executed, and the turn simply ends.\n\nThis happened for me in a long 1M-context session, and sometimes it even appears when the context is very sparse.\nMy solution is to use the /goal mode.",
+      "createdAt": "2026-06-22T12:51:44Z",
+      "url": "https://github.com/anthropics/claude-code/issues/63870#issuecomment-4768472793"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABHODzcg",
+      "author": {
+        "login": "eldkqmfhf123",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "Seeing what looks like the **same root cause** (tool-call intent leaking into the `text` channel\ninstead of a structured `tool_use` block), but with a different failure mode worth adding here.\n\nIn my case, only the leading `call` token of the `<invoke ...>` block leaks — and then it\n**degenerates into a repetition collapse**: a single assistant response emitted `\\n\\ncall`\n**~32,000 times** (a ~256 KB `text` block).\n\n### Environment\n- Claude Code (CLI), inside a `tmux` session, macOS\n- Model: **Opus 4.8 (1M context)** — `claude-opus-4-8[1m]`\n- Long multi-turn coding session with many consecutive Edit/Read/Bash tool calls\n\n### Evidence (from the session `.jsonl`, code/prose redacted)\nThe `call` string is stored **inside the `text` field of `type:\"text\"` blocks** (not a `tool_use`\nblock), same as this issue — just truncated to the first token and then repeated:\n\n```\n\"type\":\"text\",\"text\":\"<redacted prose>\\n\\ncall\\n\\ncall\\n\\ncall\\n\\ncall ... (repeated ~32000 times)\"\n```\n\nPer-turn count of `call` inside `type:\"text\"` blocks, chronological (shows the escalation):\n\n```\n3, 1, 3, 31977, 1, 1, 1, 1, 1, 1, 1, 2\n```\n\nReproduced locally with:\n```\ngrep -o '\"type\":\"text\",\"text\":\"[^\"]*\"' <session>.jsonl | grep call\n```\n\n### Relationship to this issue\n- #63870: the **full** `call` + `<invoke name=\"Bash\">...</invoke>` XML leaks as text → not executed.\n- This variant: **only** the leading `call` leaks, then loops into `\\n\\ncall` ×~32k.\n\nBoth look like the same underlying problem (legacy XML tool-use format mixing into the JSON\nresponse, cf. #49747), differing only in how much of the block leaks and whether it then collapses\ninto repetition.\n\n### Notes\n- Correlates with long context (the collapse happened deep into a long session, consistent with the\n  high cache-read tokens others reported).\n- No tool was mis-executed and no data was corrupted — the `call` is plain text.\n- No project source code is needed to reproduce; all code/prose redacted above.",
+      "createdAt": "2026-06-23T13:02:10Z",
+      "url": "https://github.com/anthropics/claude-code/issues/63870#issuecomment-4779471730"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABIHbzkg",
+      "author": {
+        "login": "KoichiroHatsuse",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "Adding a data point: still reproducing on **`2.1.196`** (Opus 4.8 1M), so the regression persists well past the `2.1.156/2.1.158` transcript above.\n\n**Environment**\n- Claude Code `2.1.196`\n- Model: Opus 4.8 (1M context)\n- Windows 11 Pro / PowerShell (primary shell; failures occur on `Bash` tool calls)\n\n**Symptom matches this issue exactly** — an intended `Bash` tool call is emitted as plain assistant text instead of a structured `tool_use`, so nothing executes and the turn stalls. Same leaked shape:\n\n```text\ncount\n<invoke name=\"Bash\">\n<parameter name=\"command\">cd \"...worktrees/review-pr-270\" && git branch --show-current && gh pr view 270 ... </parameter>\n<parameter name=\"description\">...</parameter>\n</invoke>\n```\n\n**Stray-token variant:** in my case the leaked prefix token is **`count`** (vs the `call`/`court` reported here and in #68354). Same failure, different garbled token — consistent with the \"adjacent-vocab token selected instead of the `antml:invoke` opening tag\" theory.\n\n**Trigger correlation:** clusters in long, tool-call-heavy sessions — specifically PR-review / merge-gate workflows that chain many `git` + `gh` commands with `&&` in a single Bash call. Short/fresh sessions rarely hit it.\n\n**Workaround that reliably works for me:** retry once or twice; if it sticks, `/clear` or a new session clears it (the malformed shape does not recover within the same session).\n",
+      "createdAt": "2026-06-30T03:37:29Z",
+      "url": "https://github.com/anthropics/claude-code/issues/63870#issuecomment-4839633810"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABJH1HLA",
+      "author": {
+        "login": "docentYT",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "Same with ollama and `qwen3.5:9b-q4_K_M`.",
+      "createdAt": "2026-07-07T18:26:56Z",
+      "url": "https://github.com/anthropics/claude-code/issues/63870#issuecomment-4907157292"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABJ_QW2Q",
+      "author": {
+        "login": "glzlaohuai",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "Still reproducing on 2.1.197 with claude-opus-4.8",
+      "createdAt": "2026-07-14T04:03:26Z",
+      "url": "https://github.com/anthropics/claude-code/issues/63870#issuecomment-4965275353"
+    }
+  ]
+}
