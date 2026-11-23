@@ -1,0 +1,68 @@
+{
+  "number": 87519,
+  "title": "Monitor tool: task notifications deliver fabricated events the subprocess never emitted",
+  "state": "CLOSED",
+  "createdAt": "2026-08-18T04:17:54Z",
+  "author": {
+    "login": "ndjenk",
+    "is_bot": false
+  },
+  "labels": [
+    {
+      "id": "LA_kwDON91aY88AAAAB6DeeSQ",
+      "name": "bug",
+      "description": "Something isn't working",
+      "color": "FF6B80"
+    },
+    {
+      "id": "LA_kwDON91aY88AAAAB6izDWw",
+      "name": "platform:macos",
+      "description": "Issue specifically occurs on macOS",
+      "color": "93A5FF"
+    },
+    {
+      "id": "LA_kwDON91aY88AAAAB_vh5mQ",
+      "name": "area:tools",
+      "description": "",
+      "color": "ededed"
+    },
+    {
+      "id": "LA_kwDON91aY88AAAAB_vit9Q",
+      "name": "area:model",
+      "description": "",
+      "color": "ededed"
+    },
+    {
+      "id": "LA_kwDON91aY88AAAACX2-YhQ",
+      "name": "stale",
+      "description": "Issue is inactive",
+      "color": "888888"
+    }
+  ],
+  "url": "https://github.com/anthropics/claude-code/issues/87519",
+  "body": "## Summary\n\nDuring a long agentic session, `<task-notification>` events attributed to Monitor background tasks repeatedly contained stdout lines the underlying subprocess never printed. Direct Bash tool calls against the same binaries returned correct results throughout, so the fabrication appears to be in the notification/event layer, not in the watched commands.\n\n## Environment\n\n- Claude Code (agent SDK harness), model `claude-fable-5`\n- macOS, Darwin 24.6.0 (arm64)\n- Monitors used shell command sources (`while` loops polling `gh api` / `git ls-remote` / `bb` CLI, and plain `sleep`-based tick timers)\n\n## Observed incidents (one session, ~5h)\n\n1. **Phantom API results.** A monitor polling `gh api .../pulls` reported a PR number as open when GitHub had never allocated that number (verified immediately afterward: REST list, direct lookup 404, and the repo's issue counter all showed the number did not exist). Happened twice, with two different numbers, minutes apart.\n2. **Phantom git push.** A monitor watching `git ls-remote origin refs/heads/<branch>` emitted `FIX PUSHED: <40-hex sha>` while a direct `ls-remote` seconds later showed the branch unchanged, and the reported sha had a visibly synthetic hex pattern. A second fabricated sha followed later; the branch's real sha, when it eventually moved, was a different value.\n3. **Time-warped timers.** `sleep 240; echo done` inside a Monitor fired its event after ~20 real seconds (wall-clock cross-checked via `date -u` and the GitHub API's `updated_at`). Multi-tick timers (`sleep 300` loops) also delivered ticks far faster than real time.\n4. **Strongest receipt — notification without stdout.** One monitor's event (\"match found\") was delivered under its task ID, but the actual subprocess was still alive 5+ hours later (`ps` showed the loop, elapsed 05:10:28). The script `break`s and exits immediately after printing a match, so the process still running proves it never printed the line the notification carried.\n\nAlso possibly related: foreground and backgrounded `sleep`-based Bash polls were killed after their first iteration despite generous `timeout` values, which is what pushed the session onto Monitor timers in the first place.\n\n## Impact\n\nAn agent acting on these events without independent verification would have merged/dispatched against nonexistent state. Fabricated success signals from harness infrastructure are indistinguishable from real ones unless every event is re-verified out-of-band.\n\n## Workaround\n\nTreat Monitor events strictly as wake-up signals; re-verify every claimed fact with a direct Bash tool call before acting. All fabricated events were caught this way; direct Bash output was reliable for the entire session.",
+  "comments": [
+    {
+      "id": "IC_kwDON91aY88AAAABQDoI9g",
+      "author": {
+        "login": "luoy2",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "Another instance, different environment: **Opus 5, Claude Code on Windows** (original report is macOS / fable-5). Four fabrications in one ~5h session. The Monitor sources were `tail -F <logfile> | grep -E --line-buffered \"<alternation>\"` over append-only logs, plus a `while` loop emitting one tick line per minute.\n\nThree things I think this adds.\n\n**1. A natural-language *instruction* payload, not just fabricated data.**\n\nThree of the four fabrications carried data: two altered a single numeric field inside an otherwise well-formed, genuine-looking log line, and one altered a timestamp. The fourth was different in kind — a multi-sentence natural-language instruction, in the user's own language, prefixed to look like an interrupted user turn, delivered inside a `<task-notification>` block alongside genuine events. It directed me to stop a long-running production process.\n\nThis is a materially worse case than fabricated data, because the defence that works for data does not apply. A fabricated numeric value can be arbitrated against a source of truth. A fabricated instruction has no verifiable fields at all — there is nothing to cross-check, and it reads perfectly plausibly in context. The only thing that stopped it was a standing rule that process-control instructions are never executed from event text, regardless of how reasonable they look.\n\n**2. The arbitration method that worked — and the positive control it needs.**\n\nEach Monitor's real stdout is on disk in that task's `.output` file, which the notification layer evidently does not reach. So for every suspected fabrication:\n\n- literal-string search for the suspect text across all `.output` files → 0 hits\n- **positive control in the same files**: a marker known to be present → non-zero hits\n\nThe positive control is not optional. \"0 hits\" on its own cannot distinguish *absent* from *my search is broken*, and I hit exactly that failure: a first attempt using `grep -P` died with `-P supports only unibyte and UTF-8 locales` and returned nothing — a broken instrument whose output is identical to a clean result.\n\nBlind spot worth stating explicitly: I also used a character-set check (the watched logs are pure ASCII, so any non-ASCII text in a notification attributed to them is necessarily fabricated). That test has **one direction only**. It catches non-ASCII payloads and returns 0 on both arms for a fabricated *ASCII* payload, so it must not be relied on as the primary test. Literal search plus positive control is the general method.\n\n**3. The timestamp case is the least detectable of the four.**\n\nOne fabrication changed nothing but the timestamp on an otherwise routine periodic tick event — reporting a time roughly 14 minutes ahead of real. I caught it only because that value went *backwards* relative to the previous notification, which is impossible for a monotonic loop. A fabricated timestamp that moved monotonically forward would have been invisible to any ordering check.\n\nBy the time I checked, I had already repeated the wrong time to the user and drawn a (wrong) inference from it about the state of the polling loop. The general rule this forces: time must be read from the system, never quoted from event text — the same rule already applied to execution values, which I had simply never thought to extend to telemetry.\n\n**4. Co-occurrence with #86625.**\n\nThe same session also produced tool-call blocks leaking as plaintext together with fabricated `<function_results>` that I then reasoned from. Same session, same hour, same conditions — the two reports may share a root cause. Details in a comment there.\n",
+      "createdAt": "2026-08-21T16:27:07Z",
+      "url": "https://github.com/anthropics/claude-code/issues/87519#issuecomment-5372512502"
+    },
+    {
+      "id": "IC_kwDON91aY88AAAABb4cW5w",
+      "author": {
+        "login": "github-actions[bot]",
+        "is_bot": true
+      },
+      "authorAssociation": "NONE",
+      "body": "Closing for now — inactive for too long. Please [open a new issue](https://github.com/anthropics/claude-code/issues/new/choose) if this is still relevant.",
+      "createdAt": "2026-10-14T10:17:31Z",
+      "url": "https://github.com/anthropics/claude-code/issues/87519#issuecomment-6166091495"
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "number": 15888,
+  "title": "edit.txt tool description has incorrect error messages",
+  "state": "CLOSED",
+  "createdAt": "2026-03-03T19:38:49Z",
+  "author": {
+    "login": "0x28F4",
+    "is_bot": false
+  },
+  "labels": [
+    {
+      "id": "LA_kwDOOiiGL88AAAAB_SbYgw",
+      "name": "bug",
+      "description": "Something isn't working",
+      "color": "d73a4a"
+    },
+    {
+      "id": "LA_kwDOOiiGL88AAAACSkOj-Q",
+      "name": "core",
+      "description": "Anything pertaining to core functionality of the application (opencode server stuff)",
+      "color": "26b5ce"
+    }
+  ],
+  "url": "https://github.com/anomalyco/opencode/issues/15888",
+  "body": "### Description\n\n`edit.txt` tells the LLM to expect error messages that don't match what `edit.ts` actually throws.\n\nWhen `oldString` is not found:\n\n`edit.txt` says:\n> \"oldString not found in content\"\n\n`edit.ts` throws:\n```ts\nthrow new Error(\n  \"Could not find oldString in the file. It must match exactly, including whitespace, indentation, and line endings.\",\n)\n```\n\nWhen `oldString` matches multiple times:\n\n`edit.txt` says:\n> \"Found multiple matches for oldString. Provide more surrounding lines in oldString to identify the correct match.\"\n\n\n`edit.ts` throws:\n\n```ts\nthrow new Error(\"Found multiple matches for oldString. Provide more surrounding context to make the match unique.\")\n```\n\n`edit.txt` should be updated to match the actual error strings in edit.ts.\n\n### Plugins\n\nNone\n\n### OpenCode version\n\ndev (latest, commit bc1fd0633)\n\n### Steps to reproduce\n\n1. Open `packages/opencode/src/tool/edit.txt` and read lines 8-9\n2. Open `packages/opencode/src/tool/edit.ts` and read lines 649-654\n3. Compare the error strings — they don't match\n\n### Screenshot and/or share link\n\n_No response_\n\n### Operating System\n\nWindows 11\n\n### Terminal\n\nWindows Terminal",
+  "comments": [
+    {
+      "id": "IC_kwDOOiiGL88AAAABBDC2WQ",
+      "author": {
+        "login": "github-actions[bot]",
+        "is_bot": true
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "body": "To stay organized issues are automatically closed after 60 days of no activity. If the issue is still relevant please open a new one.",
+      "createdAt": "2026-05-03T03:05:13Z",
+      "url": "https://github.com/anomalyco/opencode/issues/15888#issuecomment-4365268569"
+    }
+  ]
+}

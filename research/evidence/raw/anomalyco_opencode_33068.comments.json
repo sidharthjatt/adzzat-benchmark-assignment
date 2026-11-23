@@ -1,0 +1,49 @@
+[
+  {
+    "url": "https://api.github.com/repos/anomalyco/opencode/issues/comments/4761970381",
+    "html_url": "https://github.com/anomalyco/opencode/issues/33068#issuecomment-4761970381",
+    "issue_url": "https://api.github.com/repos/anomalyco/opencode/issues/33068",
+    "id": 4761970381,
+    "node_id": "IC_kwDOOiiGL88AAAABG9XmzQ",
+    "user": {
+      "login": "Necmttn",
+      "id": 5212808,
+      "node_id": "MDQ6VXNlcjUyMTI4MDg=",
+      "avatar_url": "https://avatars.githubusercontent.com/u/5212808?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/Necmttn",
+      "html_url": "https://github.com/Necmttn",
+      "followers_url": "https://api.github.com/users/Necmttn/followers",
+      "following_url": "https://api.github.com/users/Necmttn/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Necmttn/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/Necmttn/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Necmttn/subscriptions",
+      "organizations_url": "https://api.github.com/users/Necmttn/orgs",
+      "repos_url": "https://api.github.com/users/Necmttn/repos",
+      "events_url": "https://api.github.com/users/Necmttn/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/Necmttn/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "created_at": "2026-06-21T12:30:34Z",
+    "updated_at": "2026-06-21T12:30:34Z",
+    "body": "Read/Edit should have one text-decoding policy. For invalid UTF-8, choose one behavior and surface it explicitly: reject as binary/invalid text with byte offset, or decode lossily with a flag and forbid Edit on lossy content.\n\nSilent replacement in Edit is dangerous because oldString matching can fail against a different byte sequence than the file actually contains. Tests should cover invalid byte in first chunk, later chunk, truncated multibyte sequence, and binary detection false negatives.\n\n---\n\n_Generated with [ax](https://github.com/Necmttn/ax)._\n",
+    "author_association": "NONE",
+    "pin": null,
+    "reactions": {
+      "url": "https://api.github.com/repos/anomalyco/opencode/issues/comments/4761970381/reactions",
+      "total_count": 0,
+      "+1": 0,
+      "-1": 0,
+      "laugh": 0,
+      "hooray": 0,
+      "confused": 0,
+      "heart": 0,
+      "rocket": 0,
+      "eyes": 0
+    },
+    "performed_via_github_app": null,
+    "minimized": null
+  }
+]

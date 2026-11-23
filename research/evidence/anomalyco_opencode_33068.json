@@ -1,0 +1,26 @@
+{
+  "number": 33068,
+  "title": "[bug] Read and Edit tools handle invalid UTF-8 inconsistently: one crashes, the other silently corrupts",
+  "state": "CLOSED",
+  "createdAt": "2026-06-20T09:11:44Z",
+  "author": {
+    "login": "ghost",
+    "is_bot": false
+  },
+  "labels": [],
+  "url": "https://github.com/anomalyco/opencode/issues/33068",
+  "body": "﻿### Description\n\nThe Read tool (packages/core/src/tool/read-filesystem.ts) uses \new TextDecoder(\"utf-8\", { fatal: true }) at both paginated and non-paginated read paths (lines ~131 and ~155). When the first 64KB of a file passes the binary detection check but later content contains invalid UTF-8 sequences (e.g. orphan byte 0x80, truncated multi-byte sequences), decoder.decode() throws a TypeError. This exception is not caught and propagates as an unrecoverable Effect defect.\n\nThe Edit tool (packages/core/src/tool/edit.ts, line ~31) uses \new TextDecoder() WITHOUT { fatal: true }, meaning invalid UTF-8 bytes are silently replaced with U+FFFD replacement characters. When the model provides an oldString containing the correct characters but Edit searches the replaced text, matching fails silently with \"Could not find oldString\".\n\nTwo tools in the same codebase handle invalid UTF-8 differently: one crashes, the other silently corrupts data.\n\n### Code location\n\n- Read: https://github.com/anomalyco/opencode/blob/dev/packages/core/src/tool/read-filesystem.ts#L131-L155\n- Edit: https://github.com/anomalyco/opencode/blob/dev/packages/core/src/tool/edit.ts#L31\n\n### Steps to reproduce\n\n1. Create a file whose first 64KB is valid ASCII/UTF-8 but contains orphan byte 0x80 at position ~65000\n2. Call \read on this file → TextDecoder crashes with TypeError\n3. Call edit on this file → the invalid byte is silently replaced with U+FFFD, oldString matching fails\n\n### Expected behavior\n\nBoth tools should handle invalid UTF-8 consistently. Either both use { fatal: true } with proper error handling, or both replace invalid sequences with U+FFFD gracefully.\n\n### Environment\n\nOpenCode Desktop 1.17.8, Windows 11\r\n",
+  "comments": [
+    {
+      "id": "IC_kwDOOiiGL88AAAABG9XmzQ",
+      "author": {
+        "login": "Necmttn",
+        "is_bot": false
+      },
+      "authorAssociation": "NONE",
+      "body": "Read/Edit should have one text-decoding policy. For invalid UTF-8, choose one behavior and surface it explicitly: reject as binary/invalid text with byte offset, or decode lossily with a flag and forbid Edit on lossy content.\n\nSilent replacement in Edit is dangerous because oldString matching can fail against a different byte sequence than the file actually contains. Tests should cover invalid byte in first chunk, later chunk, truncated multibyte sequence, and binary detection false negatives.\n\n---\n\n_Generated with [ax](https://github.com/Necmttn/ax)._\n",
+      "createdAt": "2026-06-21T12:30:34Z",
+      "url": "https://github.com/anomalyco/opencode/issues/33068#issuecomment-4761970381"
+    }
+  ]
+}

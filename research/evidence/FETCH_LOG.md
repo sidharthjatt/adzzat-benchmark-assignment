@@ -17,3 +17,15 @@ Each `<owner>_<repo>_<N>.json` file uses the same field names as `gh issue view 
 | anthropics/claude-code#63870 | OK via REST | https://github.com/anthropics/claude-code/issues/63870 | 25 comments. |
 | anthropics/claude-code#104504 | OK via REST | https://github.com/anthropics/claude-code/issues/104504 | 4 comments. |
 | anthropics/claude-code#105340 | OK via REST | https://github.com/anthropics/claude-code/issues/105340 | 2 comments. |
+
+## Second batch
+
+Fetched at 2026-11-23T16:22:11Z, the same way as above.
+
+| Requested | Result | Final URL | Notes |
+|---|---|---|---|
+| anomalyco/opencode#33068 | OK via REST | https://github.com/anomalyco/opencode/issues/33068 | 1 comments. |
+| anomalyco/opencode#15888 | OK via REST | https://github.com/anomalyco/opencode/issues/15888 | 1 comments. |
+| anthropics/claude-code#79250 | OK via REST | https://github.com/anthropics/claude-code/issues/79250 | 2 comments. |
+| anthropics/claude-code#87519 | OK via REST | https://github.com/anthropics/claude-code/issues/87519 | 2 comments. |
+| anthropics/claude-code#93546 | OK via REST | https://github.com/anthropics/claude-code/issues/93546 | 1 comments. |

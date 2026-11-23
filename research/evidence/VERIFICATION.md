@@ -10,6 +10,7 @@ How it was checked:
 - "FOUND" means the saved JSON states the claim. "NOT FOUND" means it does not.
 - Each quote was checked by a script to be an exact copy of text in the saved JSON, and to be at most 20 words. The cell says whether it comes from the issue body or a comment.
 - State and created date come from the saved JSON. "Created" is the UTC date.
+- The last six rows were added later the same day, in a second batch. For the 63870 row in that batch, only the comments were searched.
 - `All-Hands-AI/OpenHands` now redirects to `OpenHands/OpenHands`. The file keeps the requested name, `All-Hands-AI_OpenHands_8805.json`.
 
 | Issue URL | Title | State | Created | Accessed | Claim checked | Result | Supporting quote (verbatim, at most 20 words; where it appears) | Contains raw log/JSONL excerpt in body? |
@@ -44,6 +45,12 @@ How it was checked:
 | https://github.com/anthropics/claude-code/issues/105340 | [MODEL] Model fabricates &lt;task-notification&gt; and Monitor events in its own output, then reports results from them | OPEN | 2026-10-27 | 2026-11-23 | Model | FOUND | "Claude Opus 5.5 (`claude-opus-5-5`)." (body) | no (7) |
 | https://github.com/anthropics/claude-code/issues/105340 | [MODEL] Model fabricates &lt;task-notification&gt; and Monitor events in its own output, then reports results from them | OPEN | 2026-10-27 | 2026-11-23 | Fabricated tool_use_id | FOUND | "It then emitted a `<task-notification>` for that task, with an invented tool_use_id ending `…vC7M`" (body) | no (7) |
 | https://github.com/anthropics/claude-code/issues/105340 | [MODEL] Model fabricates &lt;task-notification&gt; and Monitor events in its own output, then reports results from them | OPEN | 2026-10-27 | 2026-11-23 | Fake Monitor events | FOUND | "Claude armed a Monitor on the still-running script, then wrote two fake Monitor events" (body) | no (7) |
+| https://github.com/anomalyco/opencode/issues/33068 | [bug] Read and Edit tools handle invalid UTF-8 inconsistently: one crashes, the other silently corrupts | CLOSED | 2026-06-20 | 2026-11-23 | Invalid UTF-8 bytes can make the edit tool fail with "Could not find oldString" even when the model's string is correct | FOUND | "oldString containing the correct characters but Edit searches the replaced text, matching fails silently with "Could not find oldString"." (body) | no |
+| https://github.com/anomalyco/opencode/issues/15888 | edit.txt tool description has incorrect error messages | CLOSED | 2026-03-03 | 2026-11-23 | The edit tool's description text and its actual error messages do not match | FOUND | "`edit.txt` tells the LLM to expect error messages that don't match what `edit.ts` actually throws." (body) | no |
+| https://github.com/anthropics/claude-code/issues/79250 | Monitor/background task notifications fabricate completion events with future timestamps while process still running | CLOSED | 2026-07-19 | 2026-11-23 | The harness notification channel itself delivered notifications or events that did not match reality | FOUND | "the Monitor / background-Bash task-notification layer delivered **multiple fabricated completion notifications**" (body) | no |
+| https://github.com/anthropics/claude-code/issues/87519 | Monitor tool: task notifications deliver fabricated events the subprocess never emitted | CLOSED | 2026-08-18 | 2026-11-23 | The harness notification channel itself delivered notifications or events that did not match reality | FOUND | "`<task-notification>` events attributed to Monitor background tasks repeatedly contained stdout lines the underlying subprocess never printed." (body) | no |
+| https://github.com/anthropics/claude-code/issues/93546 | Forged background-task completion notifications injected into model context (absent from session transcript) | CLOSED | 2026-09-11 | 2026-11-23 | The harness notification channel itself delivered notifications or events that did not match reality | FOUND (9) | "**20+ forged "Background Task Completed" notifications were delivered into the model's context**" (body) | no |
+| https://github.com/anthropics/claude-code/issues/63870 | [BUG] Bash tool calls emitted as raw &lt;invoke&gt; text instead of executing | OPEN | 2026-05-30 | 2026-11-23 | (comments only) A commenter says an organisation permission setting that denied tool calls caused a similar symptom | FOUND (8) | "In my case, I was using an organization login that had denied all tool calls." (comment 10) | yes (6) |
 
 ## Notes
 
@@ -54,3 +61,5 @@ How it was checked:
 5. All-Hands-AI/OpenHands#8805: the body includes an agent log line (`08:05:40 - OBSERVATION`, then an `ErrorObservation`).
 6. anthropics/claude-code#63870: the JSONL in the body is introduced as a "Representative malformed JSONL shape". Parts of it are cut short with `...`.
 7. anthropics/claude-code#105340: the body describes records in the session JSONL but does not quote them. The comments describe further sessions and are not counted here.
+8. anthropics/claude-code#63870: the quote is from comment 10, by GitHub user teastburn. The same comment continues: "Ensure in `/permissions` there isn't a `*` under the `Deny` section."
+9. anthropics/claude-code#93546: the body describes the forged notifications but does not say for certain where they came from. It asks the maintainers to check "whether this session was subject to an internal injection/robustness test".
