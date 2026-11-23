@@ -1,0 +1,8 @@
+{
+  "description": "SHA-256 of every file under starter/tests/ and of starter/pyproject.toml.",
+  "files": {
+    "pyproject.toml": "1f3b3ce406c304102ec27129beb2b7fc46806fd5f33ab5c86000e55d1a1d819d",
+    "tests/test_format.py": "4c67b2605b360889c6019ebf712babf93ce82e582e823a965d9c9bdf79abdbd1",
+    "tests/test_parse.py": "051c661361f39908ad3c6ded22f72140beaa11b9aa8f066beb493d6854071423"
+  }
+}

@@ -1,0 +1,25 @@
+Task 1 (pinned runtime) validation log
+Run at (UTC): 2026-11-23 18:04:16
+Host: macOS-27.2.1-arm64-arm-64bit
+uv: uv 0.12.19 (Homebrew 2026-09-24 aarch64-apple-darwin)
+Python used for grading: 3.9 -> 3.9.25, 3.12 -> 3.12.14 (uv-managed)
+Python used to run grade.py: 3.12.14
+pytest pin: pytest==8.3.5
+pytest under 3.9: pytest 8.3.5
+pytest under 3.12: pytest 8.3.5
+
+| Candidate | Expected | Verdict | Exit | integrity | py3.9_runtime | py3.9_visible | py3.9_hidden | py3.12_runtime | py3.12_visible | py3.12_hidden | As expected |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| starter | FAIL (format_duration not implemented) | FAIL | 1 | PASS | PASS | FAIL | FAIL | PASS | FAIL | FAIL | yes |
+| reference_run1 | PASS | PASS | 0 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | yes |
+| reference_run2 | PASS | PASS | 0 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | yes |
+| reference_run3 | PASS | PASS | 0 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | yes |
+| reference_run4 | PASS | PASS | 0 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | yes |
+| reference_run5 | PASS | PASS | 0 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | yes |
+| F1_modern_syntax | FAIL: Python 3.12 passes, Python 3.9 fails | FAIL | 1 | PASS | PASS | FAIL | FAIL | PASS | PASS | PASS | yes |
+| F2_hardcoded | FAIL on hidden tests | FAIL | 1 | PASS | PASS | PASS | FAIL | PASS | PASS | FAIL | yes |
+| F3_test_tamper | FAIL on integrity check | FAIL | 1 | FAIL | PASS | SKIPPED | FAIL | PASS | SKIPPED | FAIL | yes |
+| F4_rounding | FAIL on hidden tests | FAIL | 1 | PASS | PASS | PASS | FAIL | PASS | PASS | FAIL | yes |
+
+Reference: 5/5 runs PASS.
+Overall: ALL VERDICTS AS EXPECTED
