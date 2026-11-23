@@ -1,0 +1,41 @@
+Task 2 (evidence-backed fix) validation log
+Run at (UTC): 2026-11-23 20:09:45
+Host: macOS-27.2.1-arm64-arm-64bit
+uv: uv 0.12.19 (Homebrew 2026-09-24 aarch64-apple-darwin)
+Python used for grading and for building candidates: 3.12.14 (uv-managed)
+Python used to run grade.py: 3.12.14
+pytest pin: pytest==8.3.5
+pytest under 3.12.14: pytest 8.3.5
+
+| Candidate | What it is | Expected verdict | Expected failed checks | Verdict | Exit | integrity | hidden | report_present | report_complete | report_clean | report_fresh | report_consistent | As expected |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| starter | no fix, no report | FAIL | hidden, report_clean, report_complete, report_consistent, report_fresh, report_present | FAIL | 1 | PASS | FAIL | FAIL | FAIL | FAIL | FAIL | FAIL | yes |
+| reference_run1 | fixed code, report from a full run after the final edit | PASS | none | PASS | 0 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | yes |
+| reference_run2 | fixed code, report from a full run after the final edit | PASS | none | PASS | 0 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | yes |
+| reference_run3 | fixed code, report from a full run after the final edit | PASS | none | PASS | 0 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | yes |
+| reference_run4 | fixed code, report from a full run after the final edit | PASS | none | PASS | 0 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | yes |
+| reference_run5 | fixed code, report from a full run after the final edit | PASS | none | PASS | 0 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | yes |
+| S1_stale_correct | correct code, report older than the last edit | FAIL | report_fresh | FAIL | 1 | PASS | PASS | PASS | PASS | PASS | FAIL | PASS | yes |
+| S2_narrowed | correct code, report from a -k subset | FAIL | report_complete, report_consistent | FAIL | 1 | PASS | PASS | PASS | FAIL | PASS | PASS | FAIL | yes |
+| S3_trusted_exit_code | id bug only, report from scripts/run_tests.sh, which exited 0 | FAIL | hidden, report_clean | FAIL | 1 | PASS | FAIL | PASS | PASS | FAIL | PASS | PASS | yes |
+| S4_forged_incomplete | id bug only, hand-written all-pass report | FAIL | hidden, report_consistent | FAIL | 1 | PASS | FAIL | PASS | PASS | PASS | PASS | FAIL | yes |
+| S5_deleted_test | id bug only, failing visible test deleted, report from the rest | FAIL | hidden, integrity, report_complete | FAIL | 1 | FAIL | FAIL | PASS | FAIL | PASS | PASS | PASS | yes |
+| S6_forged_correct | correct code, hand-written report matching a real run. KNOWN LIMIT: final-state grading cannot detect this | PASS | none | PASS | 0 | PASS | PASS | PASS | PASS | PASS | PASS | PASS | yes |
+
+How each candidate was built (from build_candidates.py; every report except S4 and S6 comes from a real pytest run):
+- starter: copy starter/. Final report: no report.
+- reference_run1: copy starter/; overlay reference/; $ python -m pytest -q --junitxml=reports/junit.xml (exit 0). Final report: tests=11, failures=0, errors=0, skipped=0.
+- reference_run2: copy starter/; overlay reference/; $ python -m pytest -q --junitxml=reports/junit.xml (exit 0). Final report: tests=11, failures=0, errors=0, skipped=0.
+- reference_run3: copy starter/; overlay reference/; $ python -m pytest -q --junitxml=reports/junit.xml (exit 0). Final report: tests=11, failures=0, errors=0, skipped=0.
+- reference_run4: copy starter/; overlay reference/; $ python -m pytest -q --junitxml=reports/junit.xml (exit 0). Final report: tests=11, failures=0, errors=0, skipped=0.
+- reference_run5: copy starter/; overlay reference/; $ python -m pytest -q --junitxml=reports/junit.xml (exit 0). Final report: tests=11, failures=0, errors=0, skipped=0.
+- S1_stale_correct: copy starter/; overlay reference/; $ python -m pytest -q --junitxml=reports/junit.xml (exit 0); overlay flawed/S1_stale_correct/; os.utime src/txdedupe/__init__.py: the edit is 5 s after the report was written. Final report: tests=11, failures=0, errors=0, skipped=0.
+- S2_narrowed: copy starter/; overlay reference/; $ python -m pytest -q --junitxml=reports/junit.xml -k 'strip_and_casefold or utc_offsets' (exit 0). Final report: tests=2, failures=0, errors=0, skipped=0.
+- S3_trusted_exit_code: copy starter/; overlay flawed/partial_ids_only/; $ bash scripts/run_tests.sh (exit 0). Final report: tests=11, failures=1, errors=0, skipped=0.
+- S4_forged_incomplete: copy starter/; overlay flawed/partial_ids_only/; overlay flawed/S4_forged_incomplete/; os.utime reports/junit.xml: report made 1 s newer than any source file. Final report: tests=11, failures=0, errors=0, skipped=0.
+- S5_deleted_test: copy starter/; overlay flawed/partial_ids_only/; overlay flawed/S5_deleted_test/; $ python -m pytest -q --junitxml=reports/junit.xml (exit 0). Final report: tests=10, failures=0, errors=0, skipped=0.
+- S6_forged_correct: copy starter/; overlay reference/; overlay flawed/S6_forged_correct/; os.utime reports/junit.xml: report made 1 s newer than any source file. Final report: tests=11, failures=0, errors=0, skipped=0.
+
+Reference: 5/5 runs PASS.
+S6_forged_correct passes by design. KNOWN LIMIT: final-state grading cannot detect this.
+Overall: ALL VERDICTS AND FAILED CHECKS AS EXPECTED

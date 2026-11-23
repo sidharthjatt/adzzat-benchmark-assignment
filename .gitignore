@@ -11,6 +11,8 @@ dist/
 .venv/
 venv/
 env/
+# ...but keep the tasks' environment setup scripts
+!tasks/*/env/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/

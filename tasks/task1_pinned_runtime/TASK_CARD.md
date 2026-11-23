@@ -19,7 +19,49 @@ The hidden tests also check the contract in full, so a solution that is 3.9-safe
 - The agent's workspace is a copy of `starter/`.
 - The default `python` on PATH is Python 3.12. Python 3.9 is also installed, reachable as `python3.9` or through `uv run --python 3.9`. TASK.md does not say this. The agent has to notice the target runtime in the repository and find the interpreter.
 - No network access is needed. pytest 8.3.5 is preinstalled for both interpreters.
-- This folder does not include a container image. The environment above is the specification for whoever packages the task (for example, a Terminal-Bench Dockerfile).
+- **No container image was built or tested in this submission.** There is no Dockerfile. The environment above is the specification for whoever packages the task (for example, a Terminal-Bench Dockerfile).
+
+### Setting up the environment without a container: `env/setup_env.sh`
+
+`bash env/setup_env.sh <target_dir>` copies `starter/` into `<target_dir>` and creates `<target_dir>/.agent-bin/` with three commands:
+
+- `python` and `python3`, which run uv's CPython 3.12.14,
+- `python3.9`, which runs uv's CPython 3.9.25.
+
+Each command is a small wrapper script that runs a virtual environment in `.agent-bin/envs/` with pytest 8.3.5 installed. The script prints the PATH line the agent harness should use. pytest ignores `.agent-bin/` because the starter sets `testpaths = ["tests"]`. The grader ignores it because only `src/durations` and the protected files are used.
+
+Test run on 2026-11-24 (macOS arm64, uv 0.12.19). The temporary directory is shown as `<tmp>`:
+
+```
+$ bash env/setup_env.sh <tmp>/ws
+Workspace ready: <tmp>/ws
+PATH line for the agent harness:
+export PATH="<tmp>/ws/.agent-bin:$PATH"
+$ command -v python
+<tmp>/ws/.agent-bin/python
+$ python --version
+Python 3.12.14
+$ python3 --version
+Python 3.12.14
+$ python3.9 --version
+Python 3.9.25
+$ python -m pytest --version
+pytest 8.3.5
+$ python3.9 -m pytest --version
+pytest 8.3.5
+$ make test
+src/durations/__init__.py:44: NotImplementedError
+=========================== short test summary info ============================
+FAILED tests/test_format.py::test_all_units - NotImplementedError: format_dur...
+FAILED tests/test_format.py::test_zero - NotImplementedError: format_duration...
+FAILED tests/test_format.py::test_largest_unit_folds_days_into_hours - NotImp...
+FAILED tests/test_format.py::test_max_parts_keeps_first_component - NotImplem...
+4 failed, 12 passed in 0.02s
+make: *** [test] Error 1
+make test exit status: 2
+```
+
+`make test` runs under 3.12.14 and fails on the starter, as expected: the four `format_duration` examples fail and the 12 `parse_duration` tests pass. As a further check, the reference solution was copied into a workspace made by this script, `.agent-bin/` included, and graded. The verdict was PASS.
 
 Grading environment, as validated:
 
