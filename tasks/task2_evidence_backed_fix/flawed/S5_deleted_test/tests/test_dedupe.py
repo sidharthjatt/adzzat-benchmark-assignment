@@ -56,4 +56,3 @@ def test_ids_match_after_strip_and_casefold():
         tx(" tx-9 ", "2024-03-01T10:00:00Z", amount="2.00"),
     ]
     assert dedupe(data) == [tx("tx-9", "2024-03-01T10:00:00Z", amount="2.00")]
-

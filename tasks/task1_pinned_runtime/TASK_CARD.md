@@ -101,7 +101,7 @@ If the starter's tests or `pyproject.toml` change, regenerate the manifest with 
 
 ## Validation results
 
-Copied from `VALIDATION_LOG.txt` (run at 2026-11-23 18:04:16 UTC):
+Copied from `VALIDATION_LOG.txt` (run at 2026-11-24 20:18:51 UTC):
 
 | Candidate | Expected | Verdict | Exit | integrity | py3.9_runtime | py3.9_visible | py3.9_hidden | py3.12_runtime | py3.12_visible | py3.12_hidden | As expected |
 |---|---|---|---|---|---|---|---|---|---|---|---|
