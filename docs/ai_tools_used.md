@@ -1,25 +1,21 @@
-# AI tools used
+# AI tools I used
 
-The assignment allows AI tools and asks which were used and how. No paid API, model or cloud service was bought or called for this work; the tools below were used through subscriptions I already had. No coding agent was run on the two tasks.
+The assignment allows AI tools, so here is exactly what I used and for what. I did not pay for any API, model or cloud service, and I did not run a coding agent on the two tasks.
 
-| Tool | What it contributed |
-|---|---|
-| Claude (chat, Claude Opus 5.5) | Read the assignment, my earlier projects and the first failure-analysis draft. Checked the draft's sources, proposed the four failure categories, both task designs and the grading policies recorded in each `TASK_CARD.md`, and wrote the specification for each Claude Code step. Drafted `research/failure_analysis.md` and the documents in `docs/` except `manual_walkthrough.md`. Reviewed every Claude Code output before the next step. |
-| Claude Code (Claude Opus 5.5, medium effort setting) | All repository work: archiving the GitHub issues through the public GitHub API, the script-checked quote table, the starters, graders, hidden tests, reference and flawed solutions, environment scripts, validation scripts, `docs/manual_walkthrough.md` and the README. It ran every validation reported in this repository. |
-| ChatGPT (model/version not recorded) | Wrote the initial planning brief and the first draft of the failure analysis. Every source in that draft was re-checked against an archived copy before use. Near the end, it reviewed the repository against the assignment PDF and flagged missing items: the documents were not yet merged into the repository, placeholders remained, the README still said "work in progress", and a manual walkthrough was missing. |
+**Claude (chat, Opus 5.5).** I used it as a research partner. It read the assignment, my earlier projects and the first draft of the failure analysis with me, checked the sources, and proposed the four failure categories, both task designs and the grading rules. I reviewed and accepted each design before it was built; the reasons are written in each task card. Claude drafted `research/failure_analysis.md` and most of the documents in `docs/`, and reviewed each Claude Code result before the next step.
 
-## How the work was split
+**Claude Code (Opus 5.5, medium effort).** It did the repository work from those specs: saving the GitHub issues, the script that checks every quote, the starters, graders, hidden tests, reference and wrong solutions, the environment and validation scripts, the manual walkthrough and the README. It ran every validation in this repo.
 
-Claude proposed the task designs and grading policies. I reviewed and accepted each one before it was built, and the reasoning for each is written in the task cards so it can be checked. Claude Code wrote the code from those specifications.
+**ChatGPT (model not recorded).** It wrote my first planning notes and the first draft of the failure analysis. I re-checked every source from that draft against a saved copy before using it. At the end it reviewed the repo against the assignment PDF and pointed out what was still missing.
 
-## Checks that do not rely on trusting the AI tools
+## Checks that don't depend on trusting the tools
 
-- Every quoted claim in the failure analysis was matched to archived source text by a script, and every number in it was cross-checked against the archive.
-- Every grader was run against a reference solution, the unchanged starter and deliberately wrong solutions, with the expected verdicts and the expected failing checks written down before running.
+- A script matched every quote in the failure analysis to the saved source text, and every number in it was cross-checked against the saved copies.
+- Every grader was run against the reference, the untouched starter and deliberately wrong solutions, with the expected result written down before running.
 
 ## Mistakes the tools made, and how they were caught
 
-- Claude Code's first Task 1 grader trusted pytest's exit code. Code that called `os._exit(0)` at import would have passed without running any test. Claude Code found this while probing its own grader and closed it by requiring a complete JUnit report.
-- The repository's `.gitignore` silently excluded both `env/setup_env.sh` scripts from commits. Claude Code noticed this in `git status` and fixed it.
-- Task 1's task card first gave examples of Python features that do not actually fail on Python 3.9. Claude Code checked them and replaced them.
-- One sentence of the failure analysis claimed more than its source (#93546) said about where forged notifications came from. It was corrected after the archived text was reviewed.
+- The first Task 1 grader trusted pytest's exit code alone. Code that called `os._exit(0)` on import would have passed without running a single test. This was found by probing the grader, and fixed by also requiring a complete JUnit report.
+- The `.gitignore` was quietly leaving both `env/setup_env.sh` scripts out of every commit. It was spotted in `git status` and fixed.
+- The Task 1 task card first listed Python features that don't actually fail on 3.9. They were tested and replaced.
+- One sentence in the failure analysis said more than its source (#93546) did about where fake notifications came from. I corrected it after reading the saved text.

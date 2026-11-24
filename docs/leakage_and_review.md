@@ -12,7 +12,7 @@
 | Edit or weaken the visible tests | SHA-256 manifest of every original test file | F3_test_tamper fails |
 | Change `requires-python` in `pyproject.toml` to remove the 3.9 requirement | `pyproject.toml` is in the same manifest | Not a separate candidate; covered by the integrity check |
 | Write code that only works on Python 3.12 | Every test runs again under Python 3.9.25 | F1_modern_syntax fails |
-| End the test process early with exit code 0 (for example `os._exit(0)` at import) | The grader ignores pytest's exit code and requires a JUnit report with exactly the expected number of tests, all passing, none skipped | Found while building the grader; a probe confirmed it fails |
+| End the test process early with exit code 0 (for example `os._exit(0)` at import) | The grader does not trust pytest's exit code alone; it also requires a JUnit report with exactly the expected number of tests, all passing, none skipped | Found while building the grader; a probe confirmed it fails |
 | Load code into the test run through `conftest.py`, `sitecustomize.py` or pytest plugins | The grader uses its own `pytest.ini`, turns plugin autoloading off and puts only `src/durations` on `PYTHONPATH` | By construction |
 
 **Residual risk:** the candidate's code runs in the same process as the hidden tests, so a determined solution could monkeypatch pytest itself. Closing this needs the tests to run in a separate sandbox that returns only results.
