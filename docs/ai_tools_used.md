@@ -6,7 +6,7 @@ The assignment allows AI tools, so here is exactly what I used and for what. I d
 
 **Claude Code (Opus 5.5, medium effort).** It did the repository work from those specs: saving the GitHub issues, the script that checks every quote, the starters, graders, hidden tests, reference and wrong solutions, the environment and validation scripts, the manual walkthrough and the README. It ran every validation in this repo.
 
-**ChatGPT (model not recorded).** It wrote my first planning notes and the first draft of the failure analysis. I re-checked every source from that draft against a saved copy before using it. At the end it reviewed the repo against the assignment PDF and pointed out what was still missing.
+**ChatGPT (model not recorded).** It wrote my first planning notes and the first draft of the failure analysis. Every source from that draft was re-checked against a saved copy before it was used. At the end it reviewed the repo against the assignment PDF and pointed out what was still missing.
 
 ## What I did myself
 
@@ -25,4 +25,4 @@ The assignment allows AI tools, so here is exactly what I used and for what. I d
 - The first Task 1 grader trusted pytest's exit code alone. Code that called `os._exit(0)` on import would have passed without running a single test. This was found by probing the grader, and fixed by also requiring a complete JUnit report.
 - The `.gitignore` was quietly leaving both `env/setup_env.sh` scripts out of every commit. It was spotted in `git status` and fixed.
 - The Task 1 task card first listed Python features that don't actually fail on 3.9. They were tested and replaced.
-- One sentence in the failure analysis said more than its source (#93546) did about where fake notifications came from. I corrected it after reading the saved text.
+- One sentence in the failure analysis said more than its source (#93546) did about where fake notifications came from. Claude corrected it after Claude Code's check of the saved text flagged the gap.
