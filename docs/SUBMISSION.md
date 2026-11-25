@@ -34,3 +34,10 @@ Each grader fails the untouched starter, passes the reference solution in 5 out 
 I did not run a coding agent on either task, so there are no pass rates and no difficulty numbers yet. `docs/difficulty_plan.md` explains how I would get them. I also did not build a container image; the environment is set up by `env/setup_env.sh`, which I ran and checked on macOS.
 
 Two limits are written down rather than hidden. A grader that only sees the final files cannot tell whether a correct test report came from a real run (Task 2, candidate S6). And neither task measures the steps an agent took to get there.
+
+## What I would do next
+
+1. Run a free local model through an open-source agent harness on both tasks, a few runs each, and read every failed run by hand to separate task defects from real capability failures.
+2. Build and test a container image for each task, so the environment does not depend on uv being installed.
+3. Close the S6 gap in Task 2 by having the harness run the tests itself, or log every command with its exit code, instead of trusting a report file.
+4. Add trajectory-level checks for the two categories the tasks do not cover, such as counting repeated identical failing tool calls.
