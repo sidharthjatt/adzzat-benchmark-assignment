@@ -4,7 +4,7 @@ Sidharth Choudhary
 
 ## Start here
 
-I started by reading eight public reports of coding agents failing. The most solid evidence was about agents saying "done" or "tests pass" when their current state did not back that up. So both of my tasks check a claim against real evidence instead of trusting it.
+The failure study uses eight public reports of coding agents failing. The most solid evidence was about agents saying "done" or "tests pass" when their current state did not back that up. So both of my tasks check a claim against real evidence instead of trusting it.
 
 I held the graders to the same rule. I did not trust either one until I had run it against a correct solution, the untouched starter, and several deliberately wrong solutions.
 

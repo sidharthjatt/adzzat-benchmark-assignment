@@ -1,6 +1,6 @@
 # Portfolio
 
-All three projects are public and self-made. None of them uses an employer's work.
+All three projects are public, and none of them uses an employer's work.
 
 ## Honest Mistake: evaluating an LLM agent that audits models for data leakage
 
