@@ -40,17 +40,29 @@ Each task folder contains:
 
 ## Running the validations
 
-The only requirement is [uv](https://github.com/astral-sh/uv), on macOS or Linux. uv downloads the pinned interpreters (CPython 3.9.25 and 3.12.14) and pytest 8.3.5 if they are missing. No paid API is used. From the repository root:
+Checked on macOS (Apple Silicon) and on Linux x86_64 (glibc 2.39), each from a fresh clone. The scripts need bash. On Windows, use WSL 2 with Ubuntu; native Windows was not tested. No paid API is used.
 
-```bash
-bash tasks/task1_pinned_runtime/validate.sh
-```
+1. Install uv 0.12.19 or newer.
+   - macOS: `brew install uv`
+   - Linux or WSL: `curl -LsSf https://astral.sh/uv/install.sh | sh`, then open a new terminal.
 
-```bash
-bash tasks/task2_evidence_backed_fix/validate.sh
-```
+   Check the version with `uv --version`. If it is older than 0.12.19, update it first (`brew upgrade uv`, or `uv self update` if you used the install script). An older uv may not be able to download the pinned Python versions.
 
-Each script grades the unchanged starter, the reference solution (5 times) and the flawed candidates. It writes the task's `VALIDATION_LOG.txt`, and exits 0 only if every result is as expected.
+2. Clone the repository and go into it:
+
+   ```bash
+   git clone https://github.com/sidharthjatt/adzzat-benchmark-assignment.git
+   cd adzzat-benchmark-assignment
+   ```
+
+3. Run both validations from the repository root. The first run needs internet access, because uv downloads CPython 3.9.25, CPython 3.12.14 and pytest 8.3.5.
+
+   ```bash
+   bash tasks/task1_pinned_runtime/validate.sh
+   bash tasks/task2_evidence_backed_fix/validate.sh
+   ```
+
+Each script grades the unchanged starter, the reference solution (5 times) and the flawed candidates, prints the results table and writes it to the task's `VALIDATION_LOG.txt`. It exits 0 only if every result is as expected. The last line is `Overall: ALL VERDICTS AS EXPECTED` for Task 1 and `Overall: ALL VERDICTS AND FAILED CHECKS AS EXPECTED` for Task 2. Because the log is rewritten with the new run time, `git status` will show it as modified.
 
 ## Recorded results
 
